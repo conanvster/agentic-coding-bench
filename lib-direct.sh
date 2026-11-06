@@ -24,6 +24,10 @@ direct_start() {  # модель ctx графи [журнал]
   local mmproj
   mmproj=$(python3 "$V_/model_rules.py" "$model" server | python3 -c 'import json,sys; print(json.load(sys.stdin).get("mmproj", ""))')
   [ -n "$mmproj" ] && extra+=(--mmproj "$HOME/.lmstudio/models/$mmproj" --no-mmproj-offload)
+  # 06.11: "bin" — інша версія рушія LM Studio (напр. 2.66.0 для архітектури flint, якої 2.28.2 не знає); типово 2.28.2
+  local bin_v DIRECT_BIN="$DIRECT_BIN"
+  bin_v=$(python3 "$V_/model_rules.py" "$model" server | python3 -c 'import json,sys; print(json.load(sys.stdin).get("bin", ""))')
+  [ -n "$bin_v" ] && DIRECT_BIN="$LMS_BACKENDS/llama.cpp-linux-x86_64-nvidia-cuda12-avx2-$bin_v"
   if [ "$graphs" = off ]; then
     GGML_CUDA_DISABLE_GRAPHS=1 LD_LIBRARY_PATH="$DIRECT_BIN:$DIRECT_VENDOR" "$DIRECT_BIN/llama-server" -m "$gguf" \
       -c "$ctx" -ngl 999 -fa on -np 1 --jinja --alias "$model" --host 127.0.0.1 --port "$DIRECT_PORT" "${extra[@]}" 9>&- > "$log" 2>&1 &

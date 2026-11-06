@@ -276,6 +276,51 @@
               "text"
             ]
           }
+        },
+        "qwen3.6-35b-a3b@ud-q4_k_xl": {
+          "name": "Qwen3.6 35B A3B UD-Q4_K_XL (llama-server, зір)",
+          "attachment": true,
+          "tool_call": true,
+          "reasoning": true,
+          "limit": {
+            "context": 131072,
+            "output": 32768,
+            "input": 131072
+          },
+          "interleaved": {
+            "field": "reasoning_content"
+          },
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
+          }
+        },
+        "flint@ud-q4_k_xl": {
+          "name": "flint 40B A2.5B UD-Q4_K_XL (llama-server 2.66.0)",
+          "attachment": false,
+          "tool_call": true,
+          "reasoning": true,
+          "limit": {
+            "context": 131072,
+            "output": 32768,
+            "input": 131072
+          },
+          "interleaved": {
+            "field": "reasoning_content"
+          },
+          "modalities": {
+            "input": [
+              "text"
+            ],
+            "output": [
+              "text"
+            ]
+          }
         }
       }
     }

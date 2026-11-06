@@ -1,0 +1,14 @@
+{
+  "model": "qwen3.6-35b-a3b@ud-q4_k_xl",
+  "опис": "Qwen3.6 35B A3B (MoE), UD-Q4_K_XL 20,8 ГіБ + mmproj F16 (зір); частина експертів в оперативці (-ncmoe, заміряно претестом)",
+  "sampling": {"temperature": 0.6, "top_p": 0.95, "top_k": 20, "min_p": 0.0, "presence_penalty": 0.0},
+  "passback": {"field": "reasoning_content", "keep": 6},
+  "graphs": "on",
+  "issues": [
+    {"id": "qwen-sampling", "workaround": "ті самі параметри, що в Q2_K_XL (картка Qwen3.6, thinking для кодування)"},
+    {"id": "q4-vs-q2-06-11", "symptom": "Q2_K_XL на v3 зациклювалась (92 однакові write); невідомо, вада моделі чи квантизації; Q2 тестувалась без зору", "workaround": "та сама модель на UD-Q4_K_XL із зором, ті самі умови v4.2"}
+  ],
+  "результати": [],
+  "server": {"kind": "llama-server", "port": 1246, "gguf": "unsloth/Qwen3.6-35B-A3B-GGUF/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf",
+             "mmproj": "unsloth/Qwen3.6-35B-A3B-GGUF/mmproj-F16.gguf", "args": ["-ncmoe", "AUTO"]}
+}
