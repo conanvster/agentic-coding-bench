@@ -1,0 +1,24 @@
+{
+  "model": "qwen3.5-4b-super-coder",
+  "опис": "Qwen3.5 4B super-coder (jica98), Q4_0, 2,6 ГБ; без зору",
+  "sampling": {
+    "temperature": 0.6,
+    "top_p": 0.95,
+    "top_k": 20,
+    "min_p": 0.0,
+    "presence_penalty": 0.0
+  },
+  "passback": {
+    "field": "reasoning_content",
+    "keep": 6
+  },
+  "issues": [
+    {
+      "id": "qwen-sampling",
+      "workaround": "картка Qwen3.6-35B-A3B, thinking для точного кодування: t 0.6, p 0.95, k 20"
+    }
+  ],
+  "результати": [
+    "претест 3 (графи off): ❌ зупинено вручну на етапі 0 (19 хв): Python-скрипт моделі подвоював docs/PLAN.md до 8,1 ГБ"
+  ]
+}

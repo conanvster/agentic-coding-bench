@@ -1,0 +1,39 @@
+{
+  "model": "gemma-4-12b-it-qat",
+  "опис": "Gemma 4 12B QAT, Q4_0, 6,5 ГБ; зір",
+  "sampling": {
+    "temperature": 1.0,
+    "top_p": 0.95,
+    "top_k": 64
+  },
+  "passback": {
+    "field": "reasoning",
+    "keep": 6
+  },
+  "issues": [
+    {
+      "id": "gemma-edit-args",
+      "symptom": "edit: «Missing key oldString» 12 разів поспіль — newString закінчується «…(§3, §4)`,oldString:», тобто розбирач склеїв два аргументи",
+      "cause": "розбір формату виклику Gemma 4 у рушії 2.28.2 (підозра)",
+      "workaround": "шукається: edit_replay.py на рушіях 2.28.2/2.29.1/2.66.0",
+      "status": "ВІДКРИТО",
+      "seen": "29.10 претест 2, gemma-4-26b етап 1"
+    },
+    {
+      "id": "gemma-dup-calls",
+      "symptom": "кожен виклик інструмента приходить двічі (write ×2, docker build ×2)",
+      "status": "ВІДКРИТО — рахує edit_replay.py (+dup)",
+      "seen": "29.10 претест 2, gemma-4-26b"
+    },
+    {
+      "id": "graphs",
+      "symptom": "Xid у прогонах 28–29.10 не було",
+      "workaround": "graphs: on (слово користувача 29.10: не вимикати, де не було Xid); захист run-v3.sh — перезавантаження й незарахована спроба",
+      "status": "швидкість з графами / без: не міряно"
+    }
+  ],
+  "graphs": "on",
+  "результати": [
+    "претест 3: ✅ 3/3, 14 хв, 5 спроб, 34 тис. токенів. Код: FastAPI, приймання 9/9, 6 тестів; inf → 500"
+  ]
+}

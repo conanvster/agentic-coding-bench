@@ -1,0 +1,92 @@
+{
+  "model": "qwen3.8-27b@iq4_xs",
+  "опис": "Qwen3.8 27B, UD-IQ4_XS, 15,2 ГБ; на llama-server напряму без зору (LM Studio з mmproj не вантажить навіть 8192)",
+  "sampling": {
+    "temperature": 1.0,
+    "top_p": 0.95,
+    "top_k": 20,
+    "min_p": 0.0,
+    "presence_penalty": 0.0
+  },
+  "passback": {
+    "field": "reasoning_content",
+    "keep": 6,
+    "step": 12
+  },
+  "graphs": "on",
+  "server": {
+    "kind": "llama-server",
+    "port": 1237,
+    "gguf": "unsloth/Qwen3.8-27B-GGUF/Qwen3.8-27B-UD-IQ4_XS.gguf",
+    "args": [
+      "-ctk",
+      "q8_0",
+      "-ctv",
+      "q8_0"
+    ],
+    "mmproj": "unsloth/Qwen3.8-27B-GGUF/mmproj-F16.gguf"
+  },
+  "issues": [
+    {
+      "id": "qwen-sampling",
+      "workaround": "з 30.10: картка Qwen/Qwen3.8-27B, режим роздумів: t 1.0, p 0.95, k 20, min_p 0, pp 0 (і SWE-bench у картці — t 1.0). До 30.10 було t 0.6 з картки Qwen3.6 — помилково",
+      "status": "t 0.6: претест 4 — етап 0 за 3:47, етап 1 обрізано бюджетом (26 хв, ~45 с/крок). t 1.0 — перевірити претестом 5",
+      "link": "https://huggingface.co/Qwen/Qwen3.8-27B"
+    },
+    {
+      "id": "qwen38-think-tag",
+      "symptom": "peg-native на запиті стиснення контексту OpenCode (2 повідомлення, без інструментів): відповідь починається із зайвого <think>; 6 разів поспіль по ~6000 токенів, 20 хв втрат",
+      "cause": "llama.cpp #27733 — строгий розбір викидає готову відповідь через <think>",
+      "workaround": "peg_retries (перевірити, чи досить); кандидат — enable_thinking false для запитів без інструментів",
+      "status": "ВІДКРИТО",
+      "link": "https://github.com/ggml-org/llama.cpp/issues/27733"
+    },
+    {
+      "id": "qwen38-eos-in-think",
+      "symptom": "претест 3, етап 0 (3 спроби, 0 файлів): 5207 і 12658 токенів роздумів, потім 1–2 токени відповіді, finish=stop, без виклику інструмента — OpenCode закінчує сесію, docs/PLAN.md не створено",
+      "cause": "відома вада Qwen3.8-27B: шаблон за замовчуванням ставить reasoning_effort=xhigh, модель вибирає <|im_end|> усередині <think>; на xhigh 19–50 % порожніх відповідей, на medium/low — 0–8 %; LM Studio поле reasoning_effort відкидає; температура 0 гірше, repeat_penalty 1.05–1.10 і frequency_penalty 0.3 — краще",
+      "workaround": "presence_penalty 1.5 відкочено; seed random (загальне)",
+      "status": "ВІДКРИТО. 29.10 23:35–23:49 (qwen_effort.py, з випадковим seed): синтетичний запит етапу 0 НЕ відтворює збою — LM Studio base 10/10 і pp-1.5 10/10 викликів інструмента за 4–65 с; llama-server напряму xhigh/medium/low 18/18. LM Studio рівень у шаблон не передає (prompt_tokens однакові), llama-server — передає (11973/11935/11961). Синтетика відрізняється від справжнього запиту (системна підказка OpenCode для qwen інша) — proxy.py тепер зберігає всі запити (logs/req/), відтворити на справжньому. Кандидати: server (llama-server) + chat_template_kwargs medium; seed",
+      "seen": "претест 3, logs/pre-qwen3.8-27b-iq2-xxs-s0.jsonl; той самий симптом — qwen38-empty у v1",
+      "link": "https://github.com/QwenLM/Qwen3.8/issues/216 ; https://github.com/lmstudio-ai/lmstudio-bug-tracker/issues/2542"
+    },
+    {
+      "id": "iq4-fit",
+      "symptom": "LM Studio: не вантажиться навіть з ctx 8192 (ваги 15,2 ГБ + модуль зору)",
+      "workaround": "server: llama-server без mmproj, кеш K/V q8_0, ctx 57344",
+      "status": "стеля 30.10 (ctx_ceiling.sh, llama-server -np 1, запас 400 МіБ): кеш f16 — 28672, q8_0 — 59392, q4_0 — 102400; взято q8_0 з запасом ~5 %. 27 ток/с (IQ2_XXS — ~34)"
+    },
+    {
+      "id": "qwen38-effort-medium",
+      "symptom": "претест 5: 3/3, але 50 хв (~32 с на крок, ~770 токенів) — для гри 2,5 год замало",
+      "workaround": "reasoning_effort: medium — proxy.py передає в chat_template_kwargs (llama-server напряму бере рівень у шаблон); перевірка — претест 6 проти 50 хв з рівнем за замовчуванням (xhigh)"
+    },
+    {
+      "id": "opencode-output-limit",
+      "symptom": "гра 30.10: output 32768 при context 57344 → OpenCode стискав контекст на ~24 тис. (12 стиснень за 41 хв, 38 % часу); з 8192 планувальний крок дав 7 347 токенів роздумів — впритул до межі",
+      "workaround": "opencode.json: output 16384 → стиснення на ~41 тис., запас від обрізання вдвічі"
+    },
+    {
+      "id": "passback-step",
+      "symptom": "ступінчасте вікно роздумів (proxy.py, 30.10): до keep+step−1 роздумів у запиті; у iq4_xs роздуми ~480 ток, 29 шт ≈ 14 тис. з 57k",
+      "status": "31.10: step 12 → до 17 роздумів ≈ 8 тис.",
+      "workaround": "passback.step 12"
+    },
+    {
+      "id": "v4-vision",
+      "workaround": "v4: зір через mmproj на CPU (--no-mmproj-offload)",
+      "status": "ПЕРЕВІРИТИ: відеопам'ять і швидкість кодування скриншота до прогону"
+    },
+    {
+      "id": "v4-ctx-69632",
+      "symptom": "гра v4 02.11, етап 8: при ctx 57344 модель читає цілі файли, контекст повний за 3–8 кроків → 11 стиснень за 1,5 год (35 хв), 0 записаних файлів",
+      "workaround": "ctx 69632 (q8_0 K/V, mmproj на CPU) — максимум на 16 ГБ: 15 785 МіБ; 73728 і 77824 з -ub 256 — OOM",
+      "status": "з етапу 8, 02.11"
+    }
+  ],
+  "результати": [
+    "претест 5 (30.10, t 1.0, llama-server, ctx 57344, кеш q8_0): ✅ 3/3 за 50 хв (8 + 32 + 11 хв, етап 2 пройшов перевірку на межі бюджету); ~37 с на крок; peg 0",
+    "претест 6 (30.10, reasoning_effort medium): ✅ 3/3 за 34 хв (5+19+10) проти 50 хв на типовому рівні; ~23 с на крок проти ~32; приймання 11/11 (єдина обробила nan/inf), справжній HTTP у тестах, DECISIONS.md є → medium лишаємо"
+  ],
+  "reasoning_effort": "medium"
+}

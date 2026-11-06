@@ -1,0 +1,32 @@
+{
+  "model": "gemma-4-26b-a4b-it-qat",
+  "опис": "Gemma 4 26B A4B QAT, UD-Q4_K_XL, 15,4 ГБ; зір",
+  "sampling": {
+    "temperature": 1.0,
+    "top_p": 0.95,
+    "top_k": 64
+  },
+  "passback": {
+    "field": "reasoning",
+    "keep": 6
+  },
+  "issues": [
+    {
+      "id": "gemma-edit-args",
+      "symptom": "edit: «Missing key oldString» 12 разів поспіль — newString закінчується «…(§3, §4)`,oldString:», тобто розбирач склеїв два аргументи",
+      "cause": "розбір формату виклику Gemma 4 у рушії 2.28.2 (підозра)",
+      "workaround": "шукається: edit_replay.py на рушіях 2.28.2/2.29.1/2.66.0",
+      "status": "ВІДКРИТО: синтетичний edit (edit_replay.py) збою не відтворює — 4/4 ok і на 2.28.2, і на 2.66.0; у прогоні — на довгій розмові",
+      "seen": "29.10 претест 2: gemma-4-26b 12 поспіль «Missing key oldString»; gemma-4-e4b 10 з 11 edit «Could not find oldString»"
+    },
+    {
+      "id": "gemma-dup-calls",
+      "symptom": "кожен виклик інструмента приходить двічі (write ×2, docker build ×2)",
+      "status": "ВІДКРИТО — рахує edit_replay.py (+dup)",
+      "seen": "29.10 претест 2, gemma-4-26b"
+    }
+  ],
+  "результати": [
+    "претест 3 (графи off): ✅ 3/3, 12 хв, 7 спроб (етапи 1 і 2 — з 3-ї), 58 тис. токенів; помилок edit не було. Код: Flask, приймання 9/9, 6 тестів; nan/inf → 500 HTML"
+  ]
+}

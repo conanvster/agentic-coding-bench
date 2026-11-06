@@ -1,0 +1,60 @@
+{
+  "model": "lmstudio-community/gemma-4-26b-a4b-it-qat",
+  "опис": "Gemma 4 26B A4B QAT, офіційний Q4_0, 14,4 ГБ; llama-server напряму, зір — mmproj на CPU",
+  "sampling": {
+    "temperature": 1.0,
+    "top_p": 0.95,
+    "top_k": 64,
+    "dry_multiplier": 0.8,
+    "dry_base": 1.75,
+    "dry_allowed_length": 4
+  },
+  "passback": {
+    "field": "reasoning_content",
+    "keep": 6
+  },
+  "graphs": "off",
+  "issues": [
+    {
+      "id": "graphs",
+      "workaround": "graphs: off — як у gemma-4-26b UD-Q4_K_XL (Xid 8 у претесті 1)"
+    },
+    {
+      "id": "gemma-sampling",
+      "workaround": "як у gemma-4-26b-q4kxl.json (картка Gemma 4)"
+    },
+    {
+      "id": "gemma-q40-fit",
+      "symptom": "LM Studio: не вантажиться навіть з ctx 8192",
+      "workaround": "server: llama-server без mmproj, кеш K/V q8_0, ctx 79872",
+      "status": "стеля 30.10 (ctx_ceiling.sh, llama-server -np 1, запас 400 МіБ): f16 — 53248, q8_0 — 83968 (для порівняння UD-Q4_K_XL через LM Studio із зором — 42752)"
+    },
+    {
+      "id": "v4-vision",
+      "workaround": "v4: зір через mmproj на CPU (--no-mmproj-offload)",
+      "status": "03.11 перевірено: ctx 79872 + кеш q8_0 + mmproj на CPU — 15 381 з 16 311 МіБ; опис скриншота 8 с (~300 токенів на кадр); на кадрі iq4_xs правильно побачила, що землі/столу/горизонту немає, і прочитала «PAXYHOK»"
+    },
+    {
+      "id": "gemma-reasoning-loops",
+      "symptom": "03.11: 13 відповідей обірвано на 8192 токенах — цикли в роздумах («Actually, I'll try to run it.» сотні разів)",
+      "workaround": "DRY 0.8 / base 1.75 / allowed_length 4 (llama-server, вставляє proxy.py із sampling)",
+      "status": "05.11 qa/replay_loops.py, ті самі 13 запитів ×2: без DRY — 8/26 циклів, 18/26 дійшли до виклику інструмента; DRY 0.8 — 1/26 циклів, 25/26 (archive/pretest-gemma26-2026-11-05). Погоджено користувачем 05.11"
+    }
+  ],
+  "результати": [
+    "претест 5 (30.10, llama-server, графи off): ✅ 3/3 за 7 хв (1 + 2 + 4 хв), ~6 с на крок; Flask; перепрогнати в чистому середовищі для рівних умов",
+    "якість (перевірка 30.10): Flask, 31 рядок, 6 тестів test_client, приймання 10/11 (inf → 500 HTML), DECISIONS.md є"
+  ],
+  "server": {
+    "kind": "llama-server",
+    "port": 1241,
+    "gguf": "lmstudio-community/gemma-4-26B-A4B-it-QAT-GGUF/gemma-4-26B-A4B-it-QAT-Q4_0.gguf",
+    "args": [
+      "-ctk",
+      "q8_0",
+      "-ctv",
+      "q8_0"
+    ],
+    "mmproj": "lmstudio-community/gemma-4-26B-A4B-it-QAT-GGUF/mmproj-gemma-4-26B-A4B-it-QAT-BF16.gguf"
+  }
+}

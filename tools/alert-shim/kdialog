@@ -1,0 +1,6 @@
+#!/bin/bash
+# Stand v4: Godot shows error popups via zenity/kdialog/Xdialog/xmessage (OS.alert). The model cannot see a
+# window and the real dialog blocks Godot until someone clicks OK — log the text and return at once instead.
+printf '%s\t%s\n' "$(basename "$0")" "$*" >> "${ALERT_LOG:-/tmp/godot-alerts-$(id -u).log}"
+printf 'GODOT POPUP: %s\n' "$*" >&2
+exit 0

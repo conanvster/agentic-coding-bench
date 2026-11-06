@@ -1,0 +1,52 @@
+{
+  "_про_файл": "Спільне для ВСІХ моделей: типові значення (файл моделі їх перекриває) і проблеми стенду, не прив'язані до моделі. Опис — МОДЕЛІ-ПРАВИЛА.md.",
+  "graphs": "off",
+  "peg_retries": 0,
+  "passback": null,
+  "issues": [
+    {
+      "id": "xid8-cuda-graphs",
+      "symptom": "посеред генерації карта зависає: dmesg «NVRM: Xid 8 … RC watchdog: GPU is probably locked», у LM Studio «CUDA error: the launch timed out and was terminated»; запит гине, LM Studio може підняти модель з контекстом 8192",
+      "cause": "CUDA-графи llama.cpp на Blackwell (RTX 5060 Ti, драйвер 595.99), виправлення немає",
+      "workaround": "graphs: off → GGML_CUDA_DISABLE_GRAPHS=1 у llmster (run-v3.sh перезапускає демон за потреби)",
+      "status": "обхід перевірено 29.10: з графами Xid за 9 хв, без — 0 за 20 хв (logs/stress.tsv). Для кожної моделі окремо — заміри після 2-го претесту; 29.10: швидкість з графами і без майже однакова (0–2,7 %), вимкнено лише там, де бачили Xid (gemma-4-26b, gemma-4-e4b, super-coder)",
+      "seen": "29.10 претест 1: gemma-4-26b, gemma-4-e4b (3), qwen3.5-4b-super-coder",
+      "link": "https://github.com/ggml-org/llama.cpp/issues/27330"
+    },
+    {
+      "id": "peg-native",
+      "symptom": "HTTP 500 «The model produced output that does not match the expected peg-native format» — готову відповідь викинуто",
+      "cause": "суворий розбирач формату llama.cpp не прощає зламаної службової розмітки моделі",
+      "workaround": "peg_retries: 0 — тихий повтор ПРИБРАНО 30.10: LM Studio без seed відповідає детерміновано, повтор давав ту саму зламану відповідь (претест 3: gpt-oss 6 запитів × 3 спроби, 0 врятовано). proxy.py далі буферизує і зберігає невдалі запити в logs/peg-fail/, у proxy.tsv — \"peg\": true",
+      "status": "без обходу; збій видно OpenCode (він сам повторює запит)",
+      "link": "https://github.com/ggml-org/llama.cpp/issues/27720"
+    },
+    {
+      "id": "ctx-drop-8192",
+      "symptom": "після падіння llama-server LM Studio сама підіймає модель з контекстом 8192 — далі кожен запит «exceeds the available context size»",
+      "cause": "автоперезавантаження LM Studio бере типовий контекст, а не той, з яким модель вантажили",
+      "workaround": "run-v3.sh після кожної спроби звіряє `lms ps`, перезавантажує з потрібним контекстом і не зараховує спробу (до 2 разів)",
+      "status": "діє з 2-го претесту 29.10"
+    },
+    {
+      "id": "opencode-no-sampling",
+      "symptom": "OpenCode не шле temperature/top_p — діють типові значення LM Studio, а не рекомендовані розробниками моделі",
+      "workaround": "sampling у правилах родин нижче; proxy.py дописує їх у кожен запит"
+    },
+    {
+      "id": "runtime",
+      "symptom": "рушій LM Studio llama.cpp cuda12: 2.28.2 (серпень) проти 2.66.0",
+      "status": "29.10: лишаємо 2.28.2 — на 2.66.0 gpt-oss ламає формат 12/12 проти 7/12 (з тим самим content-passback); edit Gemma однаковий (4/4)",
+      "workaround": "lms runtime select llama.cpp-linux-x86_64-nvidia-cuda12-avx2@2.28.2 (run-v3.sh перевіряє)"
+    },
+    {
+      "id": "lmstudio-deterministic",
+      "symptom": "той самий запит дає ту саму відповідь токен у токен (qwen3.8: 3 повтори — gen 587/587/587; з seed — 128/420/185/326/291)",
+      "cause": "LM Studio без поля seed бере сталий seed",
+      "workaround": "seed: \"random\" — proxy.py ставить випадковий seed у кожен запит; повторні спроби етапу й повтори OpenCode більше не відтворюють ту саму помилку",
+      "status": "перевірено 29.10 23:45 (qwen_effort.py з seed і без)",
+      "seen": "logs/qwen-effort-без-seed.tsv"
+    }
+  ],
+  "seed": "random"
+}
