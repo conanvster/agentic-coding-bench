@@ -1,0 +1,9 @@
+1|Перелік функцій і рішень (у ТЗ це «Етап 0», тут — етап 1): docs/FEATURES.md (повна таблиця F-xxx за §2) і docs/DECISIONS.md, копії макетів у docs/design/; git init і коміт
+2|Каркас монорепо (apps/web, apps/api, e2e), Docker (docker-compose.yml, docker-compose.test.yml), Makefile; порожній make test, що проходить
+3|Схема БД Prisma, міграції, детермінований сід (≥40 ігор), генератор зображень
+4|API разом із тестами (TDD), ендпоінт за ендпоінтом, за §4 і §7
+5|Frontend: сторінка за сторінкою разом з компонентними тестами
+6|E2E (Playwright), a11y (axe), візуальні тести; scripts/check-traceability у make test
+7|Поліровка під опис, адаптивність, продуктивність
+8|Фінальна перевірка з нуля: docker compose down -v && docker compose up --build -d && make test; скриншоти golden path у docs/screenshots/
+9|README.md і чесний docs/REPORT.md за §10

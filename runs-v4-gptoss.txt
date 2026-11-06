@@ -1,0 +1,3 @@
+# Гра v4 з нуля (03.11): gpt-oss-20b за рішеннями iq4_xs (README «Рішення…»): етап 8 на 6 частин, стоп «ПОТРІБЕН ПОДІЛ», обрізання при переповненні.
+# Без зору (mmproj для gpt-oss не існує) — отримує текстовий звіт сцени від godot_run. llama-server напряму (model-rules gptoss-direct).
+openai/gpt-oss-20b|gpt-oss-20b|131072

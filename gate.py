@@ -176,6 +176,13 @@ def godot_clean():
             + "\n      ".join(broken[:8]), "виправ під API Godot 4 (напр. SpatialMaterial → StandardMaterial3D)")
     rc, out = run("timeout 120 godot --headless --path . --quit", 180)
     errors = [l for l in out.splitlines() if "ERROR" in l or "GODOT POPUP" in l]
+    # v4.2 (06.11): kat — 97 вузлів з parent="Main" (корінь сам Main): Godot лише WARNING, вузли чіпляються до кореня без
+    # зміщень батька — камера в 0,0,0 у гільзі. Тепер ✗ з поясненням.
+    lost = [l.strip() for l in out.splitlines() if "has vanished when instantiating" in l]
+    if lost:
+        bad(f"у сцені {len(lost)} вузлів втратили батька — Godot чіпляє їх прямо до кореня й губить позицію батька",
+            'у .tscn прямий нащадок кореня має parent=".", онук — parent="Дитина", глибше — parent="Дитина/Онук" '
+            "(ніколи не ім'я самого кореня):\n      " + "\n      ".join(lost[:6]))
     # v4: діра 1 v3 — падіння (signal 11, handle_crash) без слова ERROR проходило; тепер код виходу й ознаки падіння
     crashed = re.search(r"handle_crash|Program crashed|signal \d+|Segmentation fault", out)
     if crashed:
@@ -212,7 +219,23 @@ def scene_visible():
             "запусти stand_godot_run mode=play і подивись скриншот і звіт сцени: чого бракує (Camera3D current, "
             "MeshInstance3D з mesh, світло)" + why)
     else:
-        ok(f"гра у вікні показує сцену: камера бачить сіток — {in_view}")
+        # v4.2 (06.11): засвічений кадр, закритий кадр і втрачені батьки — ✗, а не лише рядок у звіті
+        probs = []
+        m = re.search(r"WASHED OUT — [^;]*", text)
+        if m:
+            probs.append("кадр засвічений: " + m.group(0)[len("WASHED OUT — "):][:160])
+        m = re.search(r"BLOCKED VIEW: [^\n]*", text)
+        if m:
+            probs.append("кадр закрито: " + m.group(0)[len("BLOCKED VIEW: "):][:220])
+        m = re.search(r"LOST PARENTS: (\d+)", text)
+        if m:
+            probs.append(f"{m.group(1)} вузлів втратили батька (див. LOST PARENTS у звіті stand_godot_run)")
+        if probs:
+            bad(f"гравець не бачить сцени (сіток у полі зору камери {in_view}, але):\n      " + "\n      ".join(probs),
+                "запусти stand_godot_run mode=play і прочитай FRAME COVERAGE / BLOCKED VIEW / LOST PARENTS у звіті: "
+                "що заповнює кадр і де насправді стоїть камера")
+        else:
+            ok(f"гра у вікні показує сцену: камера бачить сіток — {in_view}")
 
 
 def looked_at_game():

@@ -1,0 +1,37 @@
+#!/bin/bash
+# Stand v4 wrapper for godot used from the shell:
+#  - error popups (OS.alert → zenity) are printed as text instead of opening a window that blocks Godot;
+#  - a run never hangs: --quit-after is added for scripts and headless runs, and there is a time limit (GODOT_TIMEOUT, 90 s).
+STAND="$(dirname "$(dirname "$(readlink -f "$0")")")"
+REAL="${REAL_GODOT:-}"
+if [ -z "$REAL" ]; then
+  IFS=: read -ra dirs <<< "$PATH"
+  for d in "${dirs[@]}"; do
+    [ -x "$d/godot" ] && [ "$(readlink -f "$d/godot")" != "$(readlink -f "$0")" ] && { REAL="$d/godot"; break; }
+  done
+fi
+[ -z "$REAL" ] && { echo "godot not found" >&2; exit 127; }
+export ALERT_LOG="$(mktemp /tmp/godot-alerts-XXXXXX.log)"
+export PATH="$STAND/tools/alert-shim:$PATH"
+args=("$@"); add=()
+long=0; quit=0
+for a in "$@"; do
+  case "$a" in
+    --quit|--quit-after|--version|-h|--help) quit=1 ;;
+    -e|--editor|-p|--project-manager|--import|--export-release|--export-debug|--export-pack|--doctool|--check-only) long=1 ;;
+  esac
+done
+if [ $quit = 0 ] && [ $long = 0 ]; then
+  for a in "$@"; do case "$a" in -s|--script|--headless) add=(--quit-after "${GODOT_QUIT_AFTER:-3000}"); break ;; esac; done
+fi
+timeout --kill-after=5 "${GODOT_TIMEOUT:-90}" "$REAL" "${args[@]}" "${add[@]}"
+rc=$?
+if [ -s "$ALERT_LOG" ]; then
+  echo "=== Godot tried to show error popup window(s):" >&2
+  cut -f2- "$ALERT_LOG" >&2
+fi
+rm -f "$ALERT_LOG"
+if [ $rc = 124 ] || [ $rc = 137 ]; then
+  echo "=== godot was stopped after ${GODOT_TIMEOUT:-90}s: it did not quit by itself. A test/tool script must call get_tree().quit() (or quit()) when done. To look at the running game use the godot_run tool (mode=play)." >&2
+fi
+exit $rc

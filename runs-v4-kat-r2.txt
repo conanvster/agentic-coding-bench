@@ -1,0 +1,2 @@
+# Гра v4.2 (06.11): kat-coder-v2.5 повтор з етапу 4 на копії її гри після етапу 3 (26bd2ab), llama-server напряму, ctx 131072.
+kat-coder-v2.5-dev-apex|kat-coder-v2.5-r2|131072

@@ -1,0 +1,12 @@
+1|Перелік функцій і рішень (у ТЗ це «Етап 0», тут — етап 1): docs/FEATURES.md (таблиця G-xx за §3) і docs/DECISIONS.md; git init і перший коміт
+2|scripts/game_state.gd разом з unit-тестами в tests/unit/ (спершу тест) і раннер tools/run_tests.sh, що їх запускає
+3|Сцена scenes/main.tscn як головна сцена проєкту (run/main_scene у project.godot): небо, земля, горизонт, вали, мішені, стіл, гільзи, освітлення, туман
+4|Blender-скрипти tools/blender/*.py для гвинтівки, рук і гільзи → assets/models/*.glb → godot --headless --path . --import → view-модель на камері
+5|Спавнер блоків (seed з --seed=N), падіння, зникнення за горизонтом (−2)
+6|Стрільба: рейкаст із центру, ефекти пострілу й руйнування (частинки, дим), процедурний звук
+7|HUD (РАХУНОК/ПАТРОНИ, піксельний шрифт з кирилицею), приціл, пауза Esc, Game Over і «Почати знову»
+8a|Сценарний тест, частина 1 з 4 — лише 5 влучань: tests/scenario/five_hits.gd (справжня main.tscn, рендер без vsync, --seed=N, фіксований крок фізики, через Input.parse_input_event, не кличе game_state напряму) — 5 влучань поспіль з перевіркою тексту HUD після кожного, рядок «frame=N event=hit …» на кожне в docs/test-log.txt, скриншоти docs/screenshots/hit_01.png…hit_05.png; тест запускає tools/run_tests.sh. Промах, падіння, Game Over, паузу, порівняння з референсом — НЕ в цій частині
+8b|Сценарний тест, частина 2 з 4 — промах і падіння: ≥1 промах (ПАТРОНИ −1, РАХУНОК незмінний) і ≥1 блок, що впав за горизонт не збитим (РАХУНОК −2), з перевіркою HUD і рядками event=miss / event=fell у docs/test-log.txt; запускає tools/run_tests.sh
+8c|Сценарний тест, частина 3 з 4 — Game Over і пауза: прогін до Game Over (стріляти в небо), перевірка вікна, docs/screenshots/game_over.png, клік «Почати знову» → РАХУНОК 0 / ПАТРОНИ 10; Esc зупиняє падіння (позиція блоку незмінна), повторний Esc продовжує; рядки event=game_over / event=restart / event=pause у docs/test-log.txt; запускає tools/run_tests.sh
+8d|Сценарний тест, частина 4 з 4 — референс і стабільність: docs/screenshots/main_like_reference.png 1408×768 (§7.3), tools/compare.py → docs/screenshots/side_by_side.png і метрики; tools/run_tests.sh запускає все (unit + сценарії), 3 прогони поспіль стабільні, без ERROR; відміть «- [x]» усі пункти розділу «## Етап 8» у docs/PLAN.md
+9|Експорт (за §8, якщо можливо), README.md і чесний docs/REPORT.md за §11

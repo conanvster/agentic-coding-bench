@@ -1,0 +1,13 @@
+1|Перелік функцій і рішень (у ТЗ це «Етап 0», тут — етап 1): docs/FEATURES.md (таблиця G-xx за §3) і docs/DECISIONS.md; git init і перший коміт
+2|scripts/game_state.gd разом з unit-тестами в tests/unit/ (спершу тест) і раннер tools/run_tests.sh, що їх запускає
+3|Сцена scenes/main.tscn як головна сцена проєкту (run/main_scene у project.godot): небо, земля, горизонт, вали, мішені, стіл, гільзи, освітлення, туман
+4|Blender-скрипти tools/blender/*.py для гвинтівки, рук і гільзи → assets/models/*.glb → godot --headless --path . --import → view-модель на камері
+5|Спавнер блоків (seed з --seed=N), падіння, зникнення за горизонтом (−2)
+6|Стрільба: рейкаст із центру, ефекти пострілу й руйнування (частинки, дим), процедурний звук
+7|HUD (РАХУНОК/ПАТРОНИ, піксельний шрифт з кирилицею), приціл, пауза Esc, Game Over і «Почати знову»
+8b|Сценарний тест, частина 2 з 6 — одне влучання: у five_hits.gd знайти блок, що падає, навести на нього приціл подіями миші (Input.parse_input_event, InputEventMouseMotion) і вистрілити кліком (InputEventMouseButton), не кличучи game_state напряму; перевірити, що текст HUD (РАХУНОК і ПАТРОНИ) змінився за правилами влучання з ТЗ; рядок «frame=N event=hit HUD before/after/expected» у docs/test-log.txt, скриншот docs/screenshots/hit_01.png
+8c|Сценарний тест, частина 3 з 6 — 5 влучань поспіль: повтори наведення й постріл з частини 2 п'ять разів, перевірка тексту HUD після кожного, рядок event=hit на кожне, скриншоти docs/screenshots/hit_01.png…hit_05.png
+8d|Сценарний тест, частина 4 з 6 — промах і падіння: ≥1 промах (ПАТРОНИ −1, РАХУНОК незмінний) і ≥1 блок, що впав за горизонт не збитим (РАХУНОК −2), з перевіркою HUD і рядками event=miss / event=fell у docs/test-log.txt; запускає tools/run_tests.sh
+8e|Сценарний тест, частина 5 з 6 — Game Over і пауза: прогін до Game Over (стріляти в небо), перевірка вікна, docs/screenshots/game_over.png, клік «Почати знову» → РАХУНОК 0 / ПАТРОНИ 10; Esc зупиняє падіння (позиція блоку незмінна), повторний Esc продовжує; рядки event=game_over / event=restart / event=pause у docs/test-log.txt; запускає tools/run_tests.sh
+8f|Сценарний тест, частина 6 з 6 — референс і стабільність: docs/screenshots/main_like_reference.png 1408×768 (§7.3), tools/compare.py → docs/screenshots/side_by_side.png і метрики; tools/run_tests.sh запускає все (unit + сценарії), 3 прогони поспіль стабільні, без ERROR; відміть «- [x]» усі пункти розділу «## Етап 8» у docs/PLAN.md
+9|Експорт (за §8, якщо можливо), README.md і чесний docs/REPORT.md за §11

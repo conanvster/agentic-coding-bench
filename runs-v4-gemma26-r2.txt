@@ -1,0 +1,1 @@
+lmstudio-community/gemma-4-26b-a4b-it-qat|gemma-4-26b-q4-0-r2|79872

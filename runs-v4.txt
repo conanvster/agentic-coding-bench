@@ -1,0 +1,7 @@
+# Гра v4 (проєкт): кандидати за аналізом v3 (АНАЛІЗ-ГРА.md). Контексти — як у v3, бюджет 9000 с.
+# УВАГА: iq4_xs, gemma-26b Q4_0 — mmproj на CPU, перевірити відеопам'ять до прогону.
+qwen3.8-27b@iq4_xs|qwen3.8-27b-iq4-xs|57344
+openai/gpt-oss-20b|gpt-oss-20b|131072
+kat-coder-v2.5-dev-apex|kat-coder-v2.5|131072
+lmstudio-community/gemma-4-26b-a4b-it-qat|gemma-4-26b-q4-0|79872
+qwen3.6-35b-a3b|qwen3.6-35b-a3b|131072

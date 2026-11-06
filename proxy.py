@@ -255,7 +255,8 @@ class Handler(BaseHTTPRequestHandler):
         while True:
             status, resp_headers, data = self._upstream(method, body, headers, self._keepalive if streaming else None,
                                                         upstream_of(model))
-            m = OVERFLOW_RE.search(data[:2000]) if status == 400 else None
+            # v4.2 (06.11): LM Studio віддає ту саму помилку з кодом 200 усередині потоку SSE (kat, 8c.1) — ловити за текстом
+            m = OVERFLOW_RE.search(data[:4000]) if status == 400 or b"exceed" in data[:4000] else None
             if m and req_obj is not None and sent.get("shrunk", 0) < 3:
                 need, have = int(m.group(1)), int(m.group(2))
                 cut = shrink_for_context(req_obj, need - have, need)

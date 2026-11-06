@@ -1,0 +1,9 @@
+# лише стенд і конфігурації; результати — у базі знань
+logs/
+archive/
+stash/
+next/
+__pycache__/
+*.pyc
+HOLD-*
+.lock

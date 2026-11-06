@@ -1,0 +1,2 @@
+# Гра v4 з нуля (03.11): gemma-4-26b Q4_0 із зором (mmproj на CPU, перевірено 03.11: 15,4 ГБ, 8 с на скриншот), рішення iq4_xs (README «Рішення…»).
+lmstudio-community/gemma-4-26b-a4b-it-qat|gemma-4-26b-q4-0|79872

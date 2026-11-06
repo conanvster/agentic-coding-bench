@@ -1,0 +1,1 @@
+openai/gpt-oss-20b|gpt-oss-20b-r2|131072

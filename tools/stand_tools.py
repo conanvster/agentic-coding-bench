@@ -125,7 +125,7 @@ def godot_errors(out, limit=25):
     keep, seen = [], set()
     lines = out.splitlines()
     for i, l in enumerate(lines):
-        if re.search(r"ERROR|SCRIPT ERROR|Parse Error|Invalid|Failed|crash|signal \d+|handle_crash", l):
+        if re.search(r"ERROR|SCRIPT ERROR|Parse Error|Invalid|Failed|crash|signal \d+|handle_crash|has vanished when instantiating", l):
             nxt = lines[i + 1].strip() if i + 1 < len(lines) and lines[i + 1].strip().startswith("at:") else ""
             key = re.sub(r"\d+", "N", l.strip())
             if key in seen:
