@@ -3,7 +3,7 @@
 3|Схема БД Prisma, міграції, детермінований сід (≥40 ігор), генератор зображень
 4|API разом із тестами (TDD), ендпоінт за ендпоінтом, за §4 і §7
 5|Frontend: сторінка за сторінкою разом з компонентними тестами
-6|E2E (Playwright), a11y (axe), візуальні тести; scripts/check-traceability у make test
+6|E2E (Playwright) у make test — мають проходити, a11y (axe), візуальні тести; скриншоти 1440 px: docs/screenshots/{landing,catalog,game,cart,receipt}-1440.png; scripts/check-traceability у make test
 7|Поліровка під опис, адаптивність, продуктивність
-8|Фінальна перевірка з нуля: docker compose down -v && docker compose up --build -d && make test; скриншоти golden path у docs/screenshots/
+8|Фінальна перевірка з нуля: docker compose down -v && docker compose up --build -d && make test; ≥ 10 E2E-сценаріїв §7 проходять; скриншоти golden path і docs/screenshots/{landing,catalog,game,cart,receipt}-1440.png
 9|README.md і чесний docs/REPORT.md за §10

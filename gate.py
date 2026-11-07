@@ -132,6 +132,7 @@ def tests(cmd, minimum=1, what="тести", timeout=3600, godot=False):
     if not (honest and compiled):
         return
     rc, out = run(cmd, timeout)
+    LAST_TESTS["out"] = out
     if godot and rc == 0 and "Godot Engine v" not in out:
         bad(f"{what}: у виводі `{cmd}` немає запуску Godot", "тести гри мають запускатися в Godot (godot --headless …)")
         return
@@ -149,6 +150,61 @@ def tests(cmd, minimum=1, what="тести", timeout=3600, godot=False):
         bad(f"{what}: є проваленні тести ({failed})", "виправ код або тест:\n      " + tail(out))
     else:
         ok(f"{what}: {passed} пройдено, проваленних немає")
+
+
+# v4.3 (07.11, слово користувача): сайт — копії макетів, справжні e2e, скриншоти 1440 для звірки з макетами
+LAST_TESTS = {}
+SHOP_INPUTS = Path("/home/alex/v4_test/inputs/shop")
+SHOP_SHOTS = ["landing", "catalog", "game", "cart", "receipt"]
+
+
+def design_copies():
+    for name, src in (("landing", "design-landing.jpg"), ("catalog", "design-catalog.jpg")):
+        p = Path(f"docs/design/{name}.jpg")
+        if not p.exists():
+            bad(f"немає docs/design/{name}.jpg", f"скопіюй макет {SHOP_INPUTS / src} у docs/design/{name}.jpg без змін (§0 ТЗ)")
+        elif p.read_bytes() != (SHOP_INPUTS / src).read_bytes():
+            bad(f"docs/design/{name}.jpg не збігається з макетом {src}", f"скопіюй файл {SHOP_INPUTS / src} без змін (cp)")
+        else:
+            ok(f"docs/design/{name}.jpg — копія макета")
+
+
+def e2e_passed(minimum):
+    """Playwright справді запустився в make test і пройшов; спеки відкривають сторінки, а не заглушки."""
+    out = LAST_TESTS.get("out")
+    if out is None:
+        return  # make test не запускався — причину вже записав tests()
+    specs = glob.glob("e2e/**/*.spec.ts", recursive=True)
+    if not any("page.goto" in Path(f).read_text(errors="ignore") for f in specs):
+        bad("e2e: жоден e2e/*.spec.ts не відкриває сторінку (page.goto)",
+            "E2E-тести мають відкривати сайт у браузері й перевіряти поведінку (§7); заглушки не рахуються")
+    pw = sum(int(x) for x in re.findall(r"^\s*(\d+) passed \(\d[\d.]*(?:ms|s|m|h)\)", out, re.M))
+    if pw < minimum:
+        bad(f"e2e: у виводі make test {pw} пройдених Playwright-тестів, потрібно ≥ {minimum}",
+            "make test має запускати Playwright у Docker (§6) і тести мають проходити (рядок «N passed (…s)»):\n      " + tail(out, 6))
+    else:
+        ok(f"e2e (Playwright): {pw} пройдено")
+
+
+def screenshots_1440():
+    import hashlib
+    seen = {}
+    for n in SHOP_SHOTS:
+        p = Path(f"docs/screenshots/{n}-1440.png")
+        if not p.exists():
+            bad(f"немає {p}", f"збережи Playwright-скриншот сторінки ({', '.join(SHOP_SHOTS)}) при ширині 1440 px як {p} — для звірки з макетом (§7)")
+            continue
+        head = p.read_bytes()[:24]
+        w = int.from_bytes(head[16:20], "big") if head[:8] == b"\x89PNG\r\n\x1a\n" else None
+        if w != 1440:
+            bad(f"{p}: ширина {w if w else '— не PNG'}, потрібно 1440", "знімай у Playwright з viewport 1440 px: page.screenshot({ path, fullPage: true })")
+            continue
+        h = hashlib.sha1(p.read_bytes()).hexdigest()
+        if h in seen:
+            bad(f"{p} однаковий із {seen[h]}", "кожен скриншот — своя сторінка")
+            continue
+        seen[h] = p
+        ok(f"{p} є, ширина 1440")
 
 
 def godot_clean():
@@ -511,6 +567,7 @@ else:
             features("F", 60, ["Neon Horizon", "промокод", "кешбек", "Quick View", "фільтр", "чек", "підписк"])
             decisions()
             need_file("docs/design/structure.txt", "копія опису лендінгу (§0)")
+            design_copies()
         elif stage == 2:
             need_file("docker-compose.yml", "сервіси db, api, web (§6)")
             need_file("Makefile", "цілі up/down/test/coverage/reset-db (§6)")
@@ -533,12 +590,16 @@ else:
             need_file("e2e/*.spec.ts", "Playwright-тести (§7)")
             need_file("scripts/check-traceability*", "матриця відповідності (§2)")
             tests(mt, 20, "make test")
+            e2e_passed(1)
+            screenshots_1440()
         elif stage == 8:
             run("docker compose up --build -d", 1800)
             rc, out = run("curl -sf -o /dev/null -w '%{http_code}' http://localhost:8088/")
             (ok if rc == 0 else lambda w: bad(w, "сайт має відповідати на :8088 після docker compose up --build -d"))(
                 f"http://localhost:8088/ → {out.strip() or 'немає відповіді'}")
             tests(mt, 20, "make test")
+            e2e_passed(10)  # §7: 10 обов'язкових E2E-сценаріїв
+            screenshots_1440()
         elif stage == 9:
             need_file("README.md", "запуск, тести, промокоди, «найновіша» гра")
             need_file("docs/REPORT.md", "чесний звіт за §10")
