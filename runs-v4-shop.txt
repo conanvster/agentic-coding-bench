@@ -1,7 +1,6 @@
-# 07.11: сайт CyberSphere v4.4, ліміт 6 год на модель (без kat — слово користувача); 6 претендентів; контексти як у грі
-qwen3.8-27b@iq4_xs|qwen3.8-27b-iq4-xs|69632
-openai/gpt-oss-20b|gpt-oss-20b|131072
-lmstudio-community/gemma-4-26b-a4b-it-qat|gemma-4-26b-q4-0|79872
-qwen3.6-35b-a3b@ud-q4_k_xl|qwen3.6-35b-a3b-q4kxl|131072
-flint@ud-q4_k_xl|flint-q4kxl|131072
+# 07.11: сайт CyberSphere v4.4, ліміт 6 год на модель; 5 моделей за претестами (слово користувача: без gemma і kat); контексти як у грі
 qwen3.6-35b-a3b|qwen3.6-35b-a3b|131072
+qwen3.6-35b-a3b@ud-q4_k_xl|qwen3.6-35b-a3b-q4kxl|131072
+qwen3.8-27b@iq4_xs|qwen3.8-27b-iq4-xs|69632
+flint@ud-q4_k_xl|flint-q4kxl|131072
+openai/gpt-oss-20b|gpt-oss-20b|131072
