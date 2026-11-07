@@ -111,10 +111,13 @@ def main():
             m = re.search(r"start (gra|shop) (\S+)", line)
             if m:
                 cur["slug"] = None
+                cur["fresh"] = True  # нова задача: лічильник етапів моделі — з нуля (07.11: Q2 показала 4 замість 2)
             m = re.search(r"(gra|shop) (\S+) етап (\S+) спроба (\d+): oc=(\S+) перевірка=(\S+)", line)
             if m:
                 task, slug, sid, att, oc, g = m.groups()
                 cur["slug"] = slug
+                if cur.pop("fresh", False):
+                    state.pop(slug, None)
                 s = state.setdefault(slug, {"passed": [], "task": task, "fails": 0})
                 if g == "0":
                     s["passed"].append(sid)
