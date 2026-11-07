@@ -7,6 +7,9 @@ V=/home/alex/v4_stand
 say() { echo "== $(date '+%F %T') $*"; }
 for p in /proc/[0-9]*; do case "$(tr '\0' ' ' < $p/cmdline 2>/dev/null)" in *"run-""v4.sh"*) say "СТОП: іде прогін (PID ${p#/proc/})"; exit 1;; esac; done 2>/dev/null
 [ -s "$V/logs/run.out" ] && { say "СТОП: logs/ не порожній"; exit 1; }
+# 07.11: перший запуск зірвав Godot-рендер MyWay на тій самій відеокарті — без вільної GPU не стартувати
+f=$(nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv,noheader 2>/dev/null | grep -v -e llama -e lmstudio)
+[ -n "$f" ] && { say "СТОП: на відеокарті чужий процес: $(echo $f) — закрий його й запусти знову"; exit 1; }
 OUT="$V/archive/pretest-shop-v44-$(date +%F-%H%M)"; mkdir -p "$OUT"
 "$HOME/.lmstudio/bin/lms" unload --all >/dev/null 2>&1 8>&-; sleep 3
 . "$V/lib-direct.sh"
