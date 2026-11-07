@@ -32,7 +32,7 @@
     "mmproj": "unsloth/Qwen3.6-35B-A3B-GGUF/mmproj-F16.gguf",
     "args": [
       "-ncmoe",
-      "20"
+      "24"
     ]
   }
 }

@@ -87,6 +87,18 @@ session_of() {
   grep -o '"sessionID":"[^"]*"' "$1" | head -1 | cut -d'"' -f4
 }
 
+# v4.4 (07.11): чужий процес на відеокарті (Godot-рендер MyWay, 1,4–1,8 ГБ) поклав qwen3.6 Q4 з CUDA OOM, і перезапуски
+# теж падали. Перед спробою й перед перезапуском — чекати, поки GPU звільниться (до 2 год); пауза не йде в бюджет моделі.
+gpu_foreign() { nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv,noheader 2>/dev/null | grep -v -e llama -e lmstudio; }
+wait_gpu_free() {  # → GPU_PAUSED (с), щоб зсунути початок задачі
+  local t0 f; t0=$(date +%s); GPU_PAUSED=0
+  f=$(gpu_foreign); [ -z "$f" ] && return 0
+  echo "== $(date '+%F %T') ПАУЗА: чужий процес на відеокарті — чекаю: $(echo $f)"
+  while [ -n "$(gpu_foreign)" ] && [ $(( $(date +%s) - t0 )) -lt 7200 ]; do sleep 20; done
+  GPU_PAUSED=$(( $(date +%s) - t0 ))
+  echo "== $(date '+%F %T') ПАУЗА скінчилась ($GPU_PAUSED с)$([ -n "$(gpu_foreign)" ] && echo ' — чужий процес досі на GPU, продовжую')"
+}
+
 run_oc() {  # wd model log session prompt → код виходу
   local wd="$1" model="$2" log="$3" session="$4" prompt="$5" rc pid
   local sflag=()
@@ -257,6 +269,8 @@ $ABILITIES
         # бюджет задачі — жорсткий: спроба не довша за залишок (раніше перевірявся лише на початку етапу)
         left=$(( budget - ($(date +%s) - task_start) ))
         if [ "$left" -le 0 ]; then echo "== бюджет $task вичерпано на етапі $sid (спроба $attempt)"; break; fi
+        wait_gpu_free; task_start=$(( task_start + GPU_PAUSED ))
+        left=$(( budget - ($(date +%s) - task_start) ))
         OC_CAP=$(( left < STAGE_CAP ? left : STAGE_CAP ))
         st=$(date +%s); st_h=$(date '+%F %T')
         fp0=$(wd_fp "$wd")
@@ -270,7 +284,7 @@ $ABILITIES
           echo "== $(date '+%F %T') $model: контекст злетів (збій сервера моделі) — перезавантаження $reloads"
           printf '%s\t%s\t%s\t%s\t%s\t-\t%s\t-\t-\tмодель злетіла, перезавантажено\n' "$task" "$model" "$sid" "$attempt" "$st_h" "$oc_rc" >> "$META"
           if [ -n "$direct" ]; then
-            direct_stop; direct_start "$model" "$ctx" "$graphs" "$LOGS/llama-server-$slug.log"
+            direct_stop; wait_gpu_free; task_start=$(( task_start + GPU_PAUSED )); direct_start "$model" "$ctx" "$graphs" "$LOGS/llama-server-$slug.log"
           else
             lmsc unload --all >/dev/null 2>&1
             lmsc load "$model" -c "$ctx" --gpu max --identifier "$model" -y < /dev/null >/dev/null 2>&1

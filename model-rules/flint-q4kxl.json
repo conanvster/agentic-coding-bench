@@ -30,7 +30,7 @@
     "gguf": "unsloth/flint-GGUF/flint-UD-Q4_K_XL.gguf",
     "args": [
       "-ncmoe",
-      "29"
+      "32"
     ]
   }
 }
