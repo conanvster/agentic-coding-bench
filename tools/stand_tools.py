@@ -483,6 +483,13 @@ def t_split_stage(a):
         if check and ALWAYS_OK.search(check):
             problems.append(f"part {i}: check `{check[:80]}` always succeeds — it must test the result "
                             f"(run the game/tests, grep a file, compare output)")
+        if check:
+            # v4.4 (07.11): qwen3.6 Q4 дала «… | ! grep …» — синтаксична помилка в bash (код 2) приймалась як
+            # «ще не зроблено», і частина 4.1 з усіма підчастинами не могла пройти ~2 год
+            src, serr = run(["bash", "-n", "-c", check], 10, cwd=str(WD))
+            if src != 0:
+                problems.append(f"part {i}: check `{check[:120]}` is not valid bash: {serr.strip()[-300:]} — "
+                                f"fix the command (e.g. `! cmd | grep` is wrong; use `! (cmd | grep -q x)` or `cmd | grep -vq x`)")
         clean.append({"title": title, "result": result, "check": check})
     if problems:
         return "ERROR: the split is not accepted:\n- " + "\n- ".join(problems) + f"\n{usage('split_stage')}", True
@@ -492,6 +499,9 @@ def t_split_stage(a):
             status.append(f"  {stage}.{i}: no own check (last part — the full stage check decides)")
             continue
         rc, out = run(["bash", "-c", p["check"]], 180, cwd=str(WD), env=godot_env())
+        if rc in (126, 127) or re.search(r"syntax error|синтаксична помилка", out, re.I):
+            return (f"ERROR: the check of part {i} is broken, not just 'not done yet' (exit {rc}). Output:\n{out[-800:]}\n"
+                    f"Fix the command and call split_stage again.\n{usage('split_stage')}"), True
         if i == 1 and rc == 0:
             return (f"ERROR: the check of part 1 already succeeds now (exit 0), so part 1 adds nothing or its check does "
                     f"not test it. Make part 1 the next real step and give a check that fails until it is done.\n"

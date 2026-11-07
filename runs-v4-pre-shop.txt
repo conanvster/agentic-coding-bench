@@ -1,0 +1,7 @@
+# 07.11: претест сайту v4.4 — 15 хв на модель (етапи 0–1: план, FEATURES/DECISIONS, копії макетів); чи зрозуміле ТЗ і чи працює зір
+qwen3.6-35b-a3b|qwen3.6-35b-a3b-pre|131072
+qwen3.6-35b-a3b@ud-q4_k_xl|qwen3.6-35b-a3b-q4kxl-pre|131072
+flint@ud-q4_k_xl|flint-q4kxl-pre|131072
+qwen3.8-27b@iq4_xs|qwen3.8-27b-iq4-xs-pre|69632
+openai/gpt-oss-20b|gpt-oss-20b-pre|131072
+lmstudio-community/gemma-4-26b-a4b-it-qat|gemma-4-26b-q4-0-pre|79872

@@ -1,6 +1,6 @@
 #!/bin/bash
-# Сайт CyberSphere v4.2 для 5 моделей (runs-v4-shop.txt, без kat), 6 год на модель (слово користувача 06.11).
-# Запуск з `su - alex` ПІСЛЯ ланцюжка ночі й перевірки димового (archive/smoke-shop-v42-*). ~30 год.
+# Сайт CyberSphere v4.4 для 6 моделей (runs-v4-shop.txt, без kat), 6 год на модель (слово користувача 06.11).
+# Запуск з `su - alex` ПІСЛЯ претесту сайту (pretest-shop-v44.sh). ~36 год.
 V=/home/alex/v4_stand
 [ -s "$V/logs/run.out" ] && { echo "== СТОП: logs/ не порожній — спершу заархівуй попередній прогін"; exit 1; }
 for p in /proc/[0-9]*; do case "$(tr '\0' ' ' < $p/cmdline 2>/dev/null)" in *"run-""v4.sh"*|*"chain-""night"*) echo "== СТОП: ще йде прогін/ланцюжок (PID ${p#/proc/})"; exit 1;; esac; done

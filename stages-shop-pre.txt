@@ -1,0 +1,1 @@
+1|Перелік функцій і рішень (у ТЗ це «Етап 0», тут — етап 1): docs/FEATURES.md (повна таблиця F-xxx за §2) і docs/DECISIONS.md, копії макетів у docs/design/; git init і коміт

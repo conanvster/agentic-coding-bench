@@ -62,7 +62,9 @@ def bad(what, fix):
 def run(cmd, timeout=3600):
     # зависання (напр. Godot без quit()) — код 124 і вбита вся група процесів, а не падіння перевірки;
     # kat у грі 1 втратила так ~34 хв бюджету
-    p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+    # v4.4 (07.11): bash, а не /bin/sh — як у stand_split_stage (там команда частини пробно запускається в bash),
+    # щоб перевірка частини поводилась у gate так само, як під час поділу
+    p = subprocess.Popen(cmd, shell=True, executable="/bin/bash", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
                          stdin=subprocess.DEVNULL, start_new_session=True)
     try:
         out, _ = p.communicate(timeout=timeout)
@@ -383,7 +385,7 @@ def part_check():
         rc, out = run(cmd, 900)
         (ok if rc == 0 else lambda w: bad(w, "доведи частину до кінця: цю команду ти сам задав при поділі, вона має "
                                              "завершуватись кодом 0. Вивід:\n      " + tail(out)))(
-            f"перевірка частини {lab} «{part['title'][:70]}»: `{cmd[:120]}` → код {rc}")
+            f"перевірка частини {lab} «{part['title'][:70]}»: `{cmd[:300]}` → код {rc}")
 
 
 def siblings():
