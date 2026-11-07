@@ -32,11 +32,17 @@ CRIT = [
     (r"load failed", "модель не завантажилась"),
     (r"два етапи поспіль не пройшли", "два етапи поспіль не пройшли — задачу зупинено"),
     (r"не вдалося виставити CUDA-графи", "не вдалося виставити CUDA-графи"),
-    (r"Traceback", "помилка Python у стенді"),
 ]
 
 
+SENT = {}  # заголовок → час: те саме критичне не частіше разу на 15 хв (07.11: збій сервера дав 15 сповіщень)
+
+
 def notify(title, text=""):
+    if title.startswith("❌") and time.time() - SENT.get(title, 0) < 900:
+        print(time.strftime("%F %T"), "пропущено (повтор):", title, flush=True)
+        return
+    SENT[title] = time.time()
     body = json.dumps({"title": title[:120], "text": text[:900]}).encode()
     req = urllib.request.Request(ENV["HUB_URL"].rstrip("/") + "/api/notify", body,
                                  {"Authorization": f"Bearer {ENV['HUB_KEY']}", "Content-Type": "application/json"})
@@ -59,6 +65,17 @@ def run_alive():
             except OSError:
                 pass
     return False
+
+
+def foreign_gpu():
+    """Сторонні процеси на відеокарті (не llama-server/LM Studio): 07.11 Godot з рендером MyWay (1,4 ГБ) поклав qwen3.6 Q4."""
+    import subprocess
+    try:
+        out = subprocess.run(["nvidia-smi", "--query-compute-apps=pid,process_name,used_memory", "--format=csv,noheader"],
+                             capture_output=True, text=True, timeout=20).stdout
+    except Exception:
+        return []
+    return [l.strip() for l in out.splitlines() if l.strip() and "llama" not in l and "lmstudio" not in l.lower()]
 
 
 def last_activity():
@@ -122,6 +139,9 @@ def main():
         if run_alive() and not warned_silent and time.time() - last_activity() > SILENT_MIN * 60:
             notify("⚠ стенд мовчить", f"≥ {SILENT_MIN} хв без нових записів у logs/ — завис?")
             warned_silent = True
+        alien = foreign_gpu() if run_alive() else []
+        if alien:
+            notify("❌ стенд: чужий процес на відеокарті", "; ".join(alien)[:400] + " — модель може впасти з нестачі пам'яті")
         free = shutil.disk_usage("/").free / 1e9
         if free < DISK_GB and not warned_disk:
             notify("⚠ мало місця на диску", f"вільно {free:.1f} ГБ")
