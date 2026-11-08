@@ -25,8 +25,10 @@ CONFIGS=(
   "C MTP 3|2.66.0|69632|-ctk q8_0 -ctv q8_0 --spec-type draft-mtp --spec-draft-n-max 3"
   "D MTP 2|2.66.0|69632|-ctk q8_0 -ctv q8_0 --spec-type draft-mtp --spec-draft-n-max 2"
   "E MTP 3 + ngram|2.66.0|69632|-ctk q8_0 -ctv q8_0 --spec-type draft-mtp,ngram-mod --spec-draft-n-max 3"
-  "F MTP 3, 81920, V q4|2.66.0|81920|-ctk q8_0 -ctv q4_0 --spec-type draft-mtp --spec-draft-n-max 3"
-  "G MTP 3, 98304, K/V q4|2.66.0|98304|-ctk q4_0 -ctv q4_0 --spec-type draft-mtp --spec-draft-n-max 3"
+  # 08.11 (слово користувача): кеш K/V у 4 бітах не тестуємо — втрачається якість; лише q8_0.
+  # На 2.28.2 стеля q8_0 — 69632 (73728 — OOM); новий рушій може бути ощадніший — перевірити 73728 і 77824
+  "F MTP 3, 73728|2.66.0|73728|-ctk q8_0 -ctv q8_0 --spec-type draft-mtp --spec-draft-n-max 3"
+  "G MTP 3, 77824|2.66.0|77824|-ctk q8_0 -ctv q8_0 --spec-type draft-mtp --spec-draft-n-max 3"
 )
 say "== $(date '+%F %T') qwen3.8 27B IQ4_XS: швидкість і контекст; зір (mmproj) на CPU у всіх варіантах"
 for c in "${CONFIGS[@]}"; do
