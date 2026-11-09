@@ -32,6 +32,8 @@ CRIT = [
     (r"load failed", "модель не завантажилась"),
     (r"два етапи поспіль не пройшли", "два етапи поспіль не пройшли — задачу зупинено"),
     (r"не вдалося виставити CUDA-графи", "не вдалося виставити CUDA-графи"),
+    (r"ПАУЗА: ", "стенд на паузі"),  # v4.5 (09.11): пауза 17:54–19:54 08.11 пройшла без сповіщення
+    (r"перевірку зупинено ззовні", "перевірка етапу зависла й зупинена"),
 ]
 
 
@@ -76,6 +78,41 @@ def foreign_gpu():
     except Exception:
         return []
     return [l.strip() for l in out.splitlines() if l.strip() and "llama" not in l and "lmstudio" not in l.lower()]
+
+
+SPEED = {}  # журнал llama-server → {"pos", "vals", "base", "warned"}
+EVAL = re.compile(r"\|\s+eval time =.*?([\d.]+) tokens per second")
+
+
+def slowdown():
+    """v4.5 (09.11): flint на сайті 5 год ішла на 40 % швидкості (оперативку з'їли Chrome/Godot) — і ніхто не знав.
+    База — середнє перших 10 відповідей; ⚠, якщо середнє останніх 8 < половини бази."""
+    logs = sorted((V / "logs").glob("llama-server-*.log"), key=lambda f: f.stat().st_mtime)
+    if not logs:
+        return None
+    f = logs[-1]
+    st = SPEED.setdefault(str(f), {"pos": 0, "vals": [], "base": None, "warned": False})
+    try:
+        with open(f, encoding="utf-8", errors="replace") as h:
+            h.seek(st["pos"])
+            for line in h:
+                m = EVAL.search(line)
+                if m and "prompt eval" not in line:
+                    st["vals"].append(float(m.group(1)))
+            st["pos"] = h.tell()
+    except OSError:
+        return None
+    v = st["vals"]
+    if st["base"] is None and len(v) >= 10:
+        st["base"] = sum(v[:10]) / 10
+    if st["base"] and len(v) >= 18:
+        cur = sum(v[-8:]) / 8
+        if cur < st["base"] / 2 and not st["warned"]:
+            st["warned"] = True
+            return f"{f.name}: {cur:.0f} ток/с проти {st['base']:.0f} на старті — бракує оперативки (своп?) чи чужий процес"
+        if cur > st["base"] * 0.7:
+            st["warned"] = False
+    return None
 
 
 def last_activity():
@@ -145,6 +182,9 @@ def main():
         alien = foreign_gpu() if run_alive() else []
         if alien:
             notify("❌ стенд: чужий процес на відеокарті", "; ".join(alien)[:400] + " — модель може впасти з нестачі пам'яті")
+        slow = slowdown() if run_alive() else None
+        if slow:
+            notify("⚠ стенд: модель сповільнилась удвічі", slow)
         free = shutil.disk_usage("/").free / 1e9
         if free < DISK_GB and not warned_disk:
             notify("⚠ мало місця на диску", f"вільно {free:.1f} ГБ")

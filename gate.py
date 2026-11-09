@@ -59,20 +59,51 @@ def bad(what, fix):
     results.append((False, what, fix))
 
 
-def run(cmd, timeout=3600):
+# v4.5 (09.11): зовнішній timeout у run-v4.sh убивав лише gate.py — make test (своя сесія) лишався сиротою й їв пам'ять
+# (qwen3.6 Q2, сайт: зациклений vitest, 9 ГБ), а модель не отримувала виводу перевірки (2 спроби × 1 год).
+# Тепер: внутрішній ліміт команд ≤ 25 хв (≪ зовнішнього 80 хв) і на SIGTERM — убити групи всіх запущених команд.
+CMD_TIMEOUT = 1500
+_GROUPS = set()
+
+
+def _on_term(signum, frame):
+    for g in list(_GROUPS):
+        try:
+            os.killpg(g, signal.SIGKILL)
+        except OSError:
+            pass
+    print("✗ перевірку зупинено ззовні (зовнішній ліміт часу) — команди перевірки вбито\n"
+          "    → тести мають завершуватись самі: без watch-режиму, без нескінченних циклів у тестах")
+    sys.exit(124)
+
+
+signal.signal(signal.SIGTERM, _on_term)
+
+
+def run(cmd, timeout=CMD_TIMEOUT):
     # зависання (напр. Godot без quit()) — код 124 і вбита вся група процесів, а не падіння перевірки;
     # kat у грі 1 втратила так ~34 хв бюджету
     # v4.4 (07.11): bash, а не /bin/sh — як у stand_split_stage (там команда частини пробно запускається в bash),
     # щоб перевірка частини поводилась у gate так само, як під час поділу
     p = subprocess.Popen(cmd, shell=True, executable="/bin/bash", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
                          stdin=subprocess.DEVNULL, start_new_session=True)
+    _GROUPS.add(p.pid)
     try:
         out, _ = p.communicate(timeout=timeout)
+        os.killpg(p.pid, signal.SIGKILL) if _alive_group(p.pid) else None  # фонові нащадки команди (vitest-воркери тощо)
         return p.returncode, out
     except subprocess.TimeoutExpired:
         os.killpg(p.pid, signal.SIGKILL)
         out, _ = p.communicate()
         return 124, (out or "") + f"\n[перевірка: команда не завершилась за {timeout} с — зависла? Godot у тесті має закінчуватись quit()]"
+
+
+def _alive_group(g):
+    try:
+        os.killpg(g, 0)
+        return True
+    except OSError:
+        return False
 
 
 def tail(text, n=12):
@@ -127,14 +158,14 @@ def godot_tests_compile(minimum):
     return not broken and checks >= minimum
 
 
-def tests(cmd, minimum=1, what="тести", timeout=3600, godot=False):
+def tests(cmd, minimum=1, what="тести", timeout=CMD_TIMEOUT, godot=False):
     """Тести мають реально виконатися: рахуємо пройдені й проваленні з виводу."""
     honest = honest_runner(cmd)
     compiled = godot_tests_compile(minimum) if godot else True
     if not (honest and compiled):
         return
     rc, out = run(cmd, timeout)
-    LAST_TESTS["out"] = out
+    LAST_TESTS["out"], LAST_TESTS["rc"] = out, rc
     if godot and rc == 0 and "Godot Engine v" not in out:
         bad(f"{what}: у виводі `{cmd}` немає запуску Godot", "тести гри мають запускатися в Godot (godot --headless …)")
         return
@@ -188,6 +219,53 @@ def e2e_passed(minimum):
         ok(f"e2e (Playwright): {pw} пройдено")
 
 
+# v4.5 (09.11): gpt-oss, сайт етапи 6–9 — 20 «e2e» виду try { goto } catch {} + expect(true).toBe(true),
+# скриншоти — однотонні прямокутники зі скрипта, make test без модульних тестів. Gate v4.4 це пропустив.
+TRIVIAL = re.compile(r"expect\(\s*(?:true|1|!0)\s*\)\s*\.\s*(?:toBe|toEqual|toBeTruthy)\s*\(\s*(?:true|1)?\s*\)"
+                     r"|catch\s*(?:\(\s*\w*\s*\))?\s*\{\s*\}|\b(?:it|test|describe)\.skip\b")
+
+
+def test_files():
+    return [p for p in Path(".").rglob("*") if re.search(r"\.(test|spec)\.[jt]sx?$", p.name)
+            and not set(p.parts) & {"node_modules", ".git", "dist", "coverage", "test-results"}]
+
+
+def fake_tests():
+    hits = []
+    for f in test_files():
+        for i, line in enumerate(f.read_text(errors="ignore").splitlines(), 1):
+            if TRIVIAL.search(line):
+                hits.append(f"{f}:{i}: {line.strip()[:90]}")
+    if hits:
+        bad(f"тести-заглушки ({len(hits)}): перевірка, що завжди проходить, ковтання помилки чи skip:\n      " + "\n      ".join(hits[:6]),
+            "тест має перевіряти поведінку (expect від результату коду, сторінки чи API); помилки не ковтати; skip не рахується")
+    else:
+        ok("заглушок у тестах немає")
+
+
+def unit_tests_in_make_test():
+    out = LAST_TESTS.get("out")
+    if out is not None and LAST_TESTS.get("rc") == 0 and not re.search(r"Tests?\s+\d+\s+passed|Tests:\s+\d+\s+passed", out):
+        bad("make test не запускає модульних тестів (немає підсумку vitest/jest «Tests N passed»)",
+            "make test має проганяти модульні й компонентні тести api і web (§6), а не лише e2e чи echo")
+
+
+def png_varied(p):
+    """Справжній знімок сторінки має багато різних байтів у розпакованих даних; однотонний кадр — одиниці."""
+    import zlib
+    data, pos, raw = p.read_bytes(), 8, b""
+    while pos + 8 <= len(data):
+        ln, typ = int.from_bytes(data[pos:pos + 4], "big"), data[pos + 4:pos + 8]
+        if typ == b"IDAT":
+            raw += data[pos + 8:pos + 8 + ln]
+        pos += 12 + ln
+    try:
+        px = zlib.decompress(raw)
+    except zlib.error:
+        return False
+    return len(set(px[:: max(1, len(px) // 200000)])) >= 32
+
+
 def screenshots_1440():
     import hashlib
     seen = {}
@@ -200,6 +278,10 @@ def screenshots_1440():
         w = int.from_bytes(head[16:20], "big") if head[:8] == b"\x89PNG\r\n\x1a\n" else None
         if w != 1440:
             bad(f"{p}: ширина {w if w else '— не PNG'}, потрібно 1440", "знімай у Playwright з viewport 1440 px: page.screenshot({ path, fullPage: true })")
+            continue
+        if not png_varied(p):
+            bad(f"{p}: однотонний або майже порожній кадр — це не знімок сторінки",
+                "знімай справжню сторінку в Playwright: await page.goto(url); await page.screenshot({ path, fullPage: true })")
             continue
         h = hashlib.sha1(p.read_bytes()).hexdigest()
         if h in seen:
@@ -588,10 +670,14 @@ else:
             tests(mt, 1, "make test")
         elif stage in (4, 5, 7):
             tests(mt, 10 if stage == 4 else 20, "make test")
+            unit_tests_in_make_test()
+            fake_tests()
         elif stage == 6:
             need_file("e2e/*.spec.ts", "Playwright-тести (§7)")
             need_file("scripts/check-traceability*", "матриця відповідності (§2)")
             tests(mt, 20, "make test")
+            unit_tests_in_make_test()
+            fake_tests()
             e2e_passed(1)
             screenshots_1440()
         elif stage == 8:
@@ -600,6 +686,8 @@ else:
             (ok if rc == 0 else lambda w: bad(w, "сайт має відповідати на :8088 після docker compose up --build -d"))(
                 f"http://localhost:8088/ → {out.strip() or 'немає відповіді'}")
             tests(mt, 20, "make test")
+            unit_tests_in_make_test()
+            fake_tests()
             e2e_passed(10)  # §7: 10 обов'язкових E2E-сценаріїв
             screenshots_1440()
         elif stage == 9:

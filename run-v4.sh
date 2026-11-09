@@ -99,6 +99,36 @@ wait_gpu_free() {  # → GPU_PAUSED (с), щоб зсунути початок �
   echo "== $(date '+%F %T') ПАУЗА скінчилась ($GPU_PAUSED с)$([ -n "$(gpu_foreign)" ] && echo ' — чужий процес досі на GPU, продовжую')"
 }
 
+# v4.5 (09.11): flint (сайт) — оперативки не вистачало (Chrome, Godot, своп 8/8), експерти в оперативці (-ncmoe)
+# витіснялись і читались з диска: 48 → 15–20 ток/с, замір нечесний. Перед спробою — чекати, поки доступно
+# ≥ min_ram_gb з правил моделі (до 2 год, як для GPU); пауза не йде в бюджет.
+ram_avail_gb() { awk '/MemAvailable/{print int($2/1048576)}' /proc/meminfo; }
+wait_ram_free() {  # need_gb → RAM_PAUSED (с)
+  local need="$1" t0; t0=$(date +%s); RAM_PAUSED=0
+  [ -z "$need" ] || [ "$need" = 0 ] && return 0
+  [ "$(ram_avail_gb)" -ge "$need" ] && return 0
+  echo "== $(date '+%F %T') ПАУЗА: мало оперативки — доступно $(ram_avail_gb) ГБ, потрібно $need (закрий Chrome/Godot)"
+  while [ "$(ram_avail_gb)" -lt "$need" ] && [ $(( $(date +%s) - t0 )) -lt 7200 ]; do sleep 20; done
+  RAM_PAUSED=$(( $(date +%s) - t0 ))
+  echo "== $(date '+%F %T') ПАУЗА скінчилась ($RAM_PAUSED с), доступно $(ram_avail_gb) ГБ"
+}
+
+# v4.5 (09.11): процеси, що лишились у каталозі моделі після спроби/перевірки (make test, vitest, сервери у фоні), —
+# сироти під systemd: зациклений vitest Q2 з'їв 9 ГБ і весь своп. Після кожної спроби й перевірки — убити їхні групи.
+# llama-server, opencode і сам стенд мають інший робочий каталог; контейнери Docker — не нащадки, їх гасить compose down.
+SELF_PGID=$(awk '{print $5}' /proc/$$/stat)
+kill_wd_leftovers() {  # wd
+  local p c g n=0
+  for p in /proc/[0-9]*; do
+    c=$(readlink "$p/cwd" 2>/dev/null) || continue
+    case "$c" in "$1"|"$1"/*) ;; *) continue;; esac
+    case "$(tr '\0' ' ' < "$p/cmdline" 2>/dev/null)" in *opencode*|*llama-server*|*run-v4.sh*) continue;; esac
+    g=$(awk '{print $5}' "$p/stat" 2>/dev/null); [ "$g" = "$SELF_PGID" ] && continue
+    [ -n "$g" ] && kill -9 -- "-$g" 2>/dev/null && n=$((n + 1))
+  done
+  [ "$n" -gt 0 ] && echo "== $(date '+%F %T') прибрано процесів-залишків у каталозі моделі: $n"
+}
+
 run_oc() {  # wd model log session prompt → код виходу
   local wd="$1" model="$2" log="$3" session="$4" prompt="$5" rc pid
   local sflag=()
@@ -163,7 +193,9 @@ for run in "${RUNS[@]}"; do
   lmsc unload --all >/dev/null 2>&1
   if ! set_graphs "$graphs"; then echo "== $(date '+%F %T') не вдалося виставити CUDA-графи $graphs для $model"; continue; fi
   direct=$(python3 "$V/model_rules.py" "$model" server 2>> "$LOGS/rules.err")
+  min_ram=$(printf '%s' "${direct:-{}}" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("min_ram_gb", 0))' 2>/dev/null || echo 0)
   if [ -n "$direct" ]; then
+    wait_ram_free "$min_ram"
     if ! direct_start "$model" "$ctx" "$graphs" "$LOGS/llama-server-$slug.log"; then
       echo "== $(date '+%F %T') load failed (llama-server): $model"; continue
     fi
@@ -270,12 +302,14 @@ $ABILITIES
         left=$(( budget - ($(date +%s) - task_start) ))
         if [ "$left" -le 0 ]; then echo "== бюджет $task вичерпано на етапі $sid (спроба $attempt)"; break; fi
         wait_gpu_free; task_start=$(( task_start + GPU_PAUSED ))
+        wait_ram_free "$min_ram"; task_start=$(( task_start + RAM_PAUSED ))
         left=$(( budget - ($(date +%s) - task_start) ))
         OC_CAP=$(( left < STAGE_CAP ? left : STAGE_CAP ))
         st=$(date +%s); st_h=$(date '+%F %T')
         fp0=$(wd_fp "$wd")
         export V4_STAGE_START="$st"  # v4.1: gate шукає скрипти моделі в /tmp, створені з початку спроби
         run_oc "$wd" "$model" "$log" "$session" "$prompt"; oc_rc=$?
+        kill_wd_leftovers "$wd"
         # Пастка: після збою llama-server (напр. Xid 8 на gemma-4-26b при 15,8 ГБ) LM Studio мовчки піднімає модель
         # з контекстом 8192 — далі кожен запит відкидається. Перезавантажити й не зараховувати спробу (до 2 разів).
         # для llama-server напряму — те саме, але ознака збою: процес помер або не відповідає
@@ -298,7 +332,9 @@ $ABILITIES
           wd_gone=1; break
         fi
         [ -z "$session" ] && session=$(session_of "$log")
-        gate_out=$(cd "$wd" && timeout 3600 bash -c "$gate" < /dev/null 2>&1); gate_rc=$?
+        # v4.5: зовнішній ліміт 80 хв > внутрішнього (gate.py: команди ≤ 25 хв, етап 8 — збірка до 30 хв); SIGTERM gate ловить сам
+        gate_out=$(cd "$wd" && timeout --kill-after=60 4800 bash -c "$gate" < /dev/null 2>&1); gate_rc=$?
+        kill_wd_leftovers "$wd"
         printf '%s\n' "$gate_out" > "$LOGS/$task-$slug-s$sid-a$attempt.gate"
         printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$task" "$model" "$sid" "$attempt" "$st_h" "$(( $(date +%s) - st ))" \
           "$oc_rc" "$gate_rc" "$(jsonl_stats "$log")" >> "$META"
