@@ -224,6 +224,8 @@ for run in "${RUNS[@]}"; do
     inputs=$(find "$(dirname "$tz")" -maxdepth 1 -type f ! -name '*.jpg' -printf "'%p' " ; find "$(dirname "$tz")" -maxdepth 1 -type f -name '*.jpg' -printf "'%p' ")
     [ -n "${EXTRA_NOTE:-}" ] && extra="$extra $EXTRA_NOTE"
     extra="$extra Вхідні файли (абсолютні шляхи, лише читати; .jpg бачать лише моделі із зором): $inputs"
+    # v4.6 (09.11, слово користувача): етапний тест — спільна база етапів 0–2 (bases/), модель робить лише наступний етап
+    if [ -n "${BASE_DIR:-}" ] && [ ! -e "$wd" ]; then "$V/tools/deploy_base.sh" "$BASE_DIR" "$wd" || continue; fi
     mkdir -p "$wd" "$(dirname "$wd")"
     ls -1 "$(dirname "$wd")" > "$LOGS/.siblings-$task-$slug"
     export GATE_SIBLINGS="$LOGS/.siblings-$task-$slug"

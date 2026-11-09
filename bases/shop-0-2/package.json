@@ -1,0 +1,24 @@
+{
+  "name": "cybersphere",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/api",
+    "apps/web",
+    "e2e"
+  ],
+  "scripts": {
+    "lint": "eslint . && prettier --check .",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test:unit": "npm run test --workspace=apps/api && npm run test --workspace=apps/web",
+    "test:ci": "npm run lint && npm run typecheck && npm run test:unit"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.14.0",
+    "eslint": "^9.14.0",
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "^3.3.3",
+    "typescript": "^5.6.3",
+    "typescript-eslint": "^8.13.0"
+  }
+}

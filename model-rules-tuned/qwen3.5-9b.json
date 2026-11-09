@@ -1,0 +1,35 @@
+{
+  "model": "qwen3.5-9b",
+  "опис": "Qwen3.5 9B (03.2026), Q8_0, 10,5 ГБ із зором; з міркуваннями",
+  "sampling": {
+    "temperature": 0.6,
+    "top_p": 0.95,
+    "top_k": 20,
+    "min_p": 0.0,
+    "presence_penalty": 0.0
+  },
+  "passback": null,
+  "graphs": "on",
+  "issues": [
+    {
+      "id": "qwen35-sampling",
+      "workaround": "картка Qwen/Qwen3.5-9B, «Thinking, precise coding»: t 0.6, p 0.95, k 20, pp 0"
+    },
+    {
+      "id": "qwen35-history",
+      "workaround": "passback: null — картка: «у багатокрокових розмовах лише остаточна відповідь в історії, без міркувань»"
+    },
+    {
+      "id": "graphs",
+      "workaround": "graphs: on — Xid не бачили; super-coder (та сама родина 4B) мав Xid — стежити"
+    },
+    {
+      "id": "qwen35-9b-fit",
+      "status": "стеля 30.10 (ctx_ceiling.sh, llama-server -np 1, запас 400 МіБ): LM Studio із зором — 180224; взято 131072, як у більшості моделей"
+    }
+  ],
+  "результати": [
+    "претест 5 (30.10): ✅ 3/3 за 13 хв (2 + 8 + 3 хв), ~10 с на крок; стандартна бібліотека (на неї могла вплинути зламаний Flask у ~/.local) — перепрогнати в чистому середовищі",
+    "якість (перевірка 30.10): 5 тестів через справжній сервер (subprocess), приймання 9/11 (nan/inf обривають з'єднання), DECISIONS.md є"
+  ]
+}

@@ -1,0 +1,11 @@
+# Образ для make test: усі залежності, lint/typecheck/unit (e2e — окремим сервісом з етапу 6)
+FROM node:20-slim
+RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
+WORKDIR /repo
+COPY package.json package-lock.json ./
+COPY apps/api/package.json apps/api/
+COPY apps/web/package.json apps/web/
+COPY e2e/package.json e2e/
+RUN npm ci
+COPY . .
+# prisma generate — додати, щойно в schema.prisma з'являться моделі (етап 3)

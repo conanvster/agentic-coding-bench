@@ -1,0 +1,45 @@
+{
+  "model": "flint@ud-q4_k_xl",
+  "опис": "flint 40B-A2.5B (MoE, RecursiveSI, Apache 2.0, 10.2026), unsloth UD-Q4_K_XL 23,3 ГіБ; без зору; архітектура flint — рушій 2.66.0; частина експертів в оперативці (-ncmoe, претест)",
+  "sampling": {
+    "temperature": 1.0,
+    "top_p": 0.95,
+    "top_k": 20
+  },
+  "passback": {
+    "field": "reasoning_content",
+    "keep": 6
+  },
+  "graphs": "on",
+  "issues": [
+    {
+      "id": "flint-sampling",
+      "workaround": "картка RecursiveSI/flint: t 1.0, p 0.95, k 20; зберігати reasoning_content між кроками"
+    },
+    {
+      "id": "flint-engine",
+      "symptom": "рушій 2.28.2 не знає архітектури flint",
+      "workaround": "server.bin 2.66.0 (lib-direct.sh, 06.11); інші моделі лишаються на 2.28.2"
+    },
+    {
+      "id": "ram-thrash",
+      "symptom": "сайт 08.11: з ~30-ї хв оперативки бракувало (Chrome 6 ГБ, Godot, своп 8/8) — експерти (-ncmoe 32, ~10 ГБ) читались з диска 0,9 ГБ/с, генерація 48 → 15–20 ток/с, підказка 172 → 40",
+      "workaround": "v4.5: server.min_ram_gb 20 — стенд чекає, поки доступно ≥ 20 ГБ (пауза до 2 год, не в бюджет); добавка +3,5 год на чистій машині (09.11) — етап 5 пройдено",
+      "status": "ВИРІШЕНО у v4.5"
+    }
+  ],
+  "результати": [
+    "сайт v4.4 (07–09.11): 0–5 (6 год, з них ~5,5 год на 40 % швидкості через нестачу оперативки, + 3,5 год чистих); гра v4.2: 0–8a"
+  ],
+  "server": {
+    "kind": "llama-server",
+    "port": 1247,
+    "bin": "2.66.0",
+    "gguf": "unsloth/flint-GGUF/flint-UD-Q4_K_XL.gguf",
+    "args": [
+      "-ncmoe",
+      "32"
+    ],
+    "min_ram_gb": 20
+  }
+}

@@ -165,6 +165,7 @@ def tests(cmd, minimum=1, what="тести", timeout=CMD_TIMEOUT, godot=False):
     if not (honest and compiled):
         return
     rc, out = run(cmd, timeout)
+    out = re.sub(r"\x1b\[[0-9;]*m", "", out)  # v4.5.2: кольори vitest/docker розривають «Tests  N passed»
     LAST_TESTS["out"], LAST_TESTS["rc"] = out, rc
     if godot and rc == 0 and "Godot Engine v" not in out:
         bad(f"{what}: у виводі `{cmd}` немає запуску Godot", "тести гри мають запускатися в Godot (godot --headless …)")
