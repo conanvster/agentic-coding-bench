@@ -1,0 +1,42 @@
+== 2026-11-09 23:20:56 замір налаштувань 4 моделей; запити: 27k, 46k, 63k і «зсув вікна» на 46k
+
+## Q2 tuned: рушій 2.66.0, ctx 131072, 
+  вільно відеопам'яті після старту: 1447 MiB
+  r27k: підказка 30215 ток., перечитано 30215 за 14 с (2193 ток/с); відповідь 116 ток. 96.8 ток/с; усього 16 с
+    формат: finish=tool_calls, викликів інструментів 1 (bash, аргументи JSON: True), міркувань 12 симв.
+  r63k: підказка 46746 ток., перечитано 34141 за 16 с (2124 ток/с); відповідь 1200 ток. 90.2 ток/с; усього 30 с
+  r63k: ПОМИЛКА Unterminated string starting at: line 1 column 12 (char 11)
+  r46k: підказка 43727 ток., перечитано 22151 за 11 с (1959 ток/с); відповідь 1077 ток. 89.6 ток/с; усього 24 с
+    формат: finish=tool_calls, викликів інструментів 1 (edit, аргументи JSON: True), міркувань 166 симв.
+  r46k після зсуву вікна: підказка 43591 ток., перечитано 22015 за 11 с (1995 ток/с); відповідь 1200 ток. 88.3 ток/с; усього 25 с
+    формат: finish=length, викликів інструментів 1 (stand_edit_lines, аргументи JSON: True), міркувань 1282 симв.
+  вільно відеопам'яті під навантаженням: 82 MiB; оперативки доступно 19 ГБ
+
+## Q4 tuned: рушій 2.66.0, ctx 131072, зір на CPU, -ncmoe 26 -ub 2048 -b 2048
+  вільно відеопам'яті після старту: 1850 MiB
+  r27k: підказка 30215 ток., перечитано 30215 за 31 с (961 ток/с); відповідь 413 ток. 54.2 ток/с; усього 40 с
+    формат: finish=tool_calls, викликів інструментів 1 (bash, аргументи JSON: True), міркувань 1174 симв.
+  r63k: підказка 46746 ток., перечитано 34141 за 21 с (1628 ток/с); відповідь 1200 ток. 52.1 ток/с; усього 45 с
+    формат: finish=length, викликів інструментів 0, міркувань 4353 симв.
+  r46k: підказка 43727 ток., перечитано 22151 за 14 с (1543 ток/с); відповідь 1200 ток. 48.7 ток/с; усього 40 с
+    формат: finish=tool_calls, викликів інструментів 1 (stand_edit_lines, аргументи JSON: True), міркувань 256 симв.
+  r46k після зсуву вікна: підказка 43591 ток., перечитано 22015 за 17 с (1264 ток/с); відповідь 1200 ток. 53.0 ток/с; усього 40 с
+  зсув: ПОМИЛКА Unterminated string starting at: line 1 column 133 (char 132)
+  зір (макет на CPU): 30 с; міркувань 2145 симв.; «Ось короткий опис блоків макету зверху вниз:
+
+1.  **Шапка (Header):** Логотип "CyberSphere", головне»
+  вільно відеопам'яті під навантаженням: 1690 MiB; оперативки доступно 18 ГБ
+
+## qwen3.8 MTP2 61440: рушій 2.66.0, ctx 61440, зір на CPU, -ctk q8_0 -ctv q8_0 --spec-type draft-mtp --spec-draft-n-max 2
+  не піднявся: LMSTUDIO_STARTUP_ERROR:{"schemaVersion":1,"code":"model_load_failed","message":"Failed to initialize the context: failed to allocate buffer for kv cache"}
+0.13.172.862 E srv  server_run_i: exiting due to model loading error
+
+## qwen3.8 MTP3 61440: рушій 2.66.0, ctx 61440, зір на CPU, -ctk q8_0 -ctv q8_0 --spec-type draft-mtp --spec-draft-n-max 3
+  не піднявся: 0.02.452.094 LMSTUDIO_STARTUP_ERROR:{"schemaVersion":1,"code":"model_load_failed","message":"Failed to initialize the context: failed to allocate buffer for kv cache"}
+0.02.452.423 E srv  server_run_i: exiting due to model loading error
+
+## qwen3.8 MTP2 53248: рушій 2.66.0, ctx 53248, зір на CPU, -ctk q8_0 -ctv q8_0 --spec-type draft-mtp --spec-draft-n-max 2
+  не піднявся: LMSTUDIO_STARTUP_ERROR:{"schemaVersion":1,"code":"model_load_failed","message":"Failed to initialize the context: failed to allocate buffer for kv cache"}
+0.01.989.452 E srv  server_run_i: exiting due to model loading error
+
+== 2026-11-09 23:26:46 готово → /home/alex/v4_stand/bench-tune/results-2026-11-09-2320.txt

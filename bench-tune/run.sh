@@ -37,6 +37,15 @@ CONFIGS=(
   "qwen3.8 2.66 точки MTP3|$Q38|$Q38MM|2.66.0|69632|-ctk q8_0 -ctv q8_0 $CP --spec-type draft-mtp --spec-draft-n-max 3"
   "qwen3.8 2.66 MTP2 без зору|$Q38||2.66.0|69632|-ctk q8_0 -ctv q8_0 $CP --spec-type draft-mtp --spec-draft-n-max 2"
 )
+# SET=2 (09.11, дозамір): MTP при ctx 69632 не вміщається (бракує 449 МіБ на стан чернетки) — менший контекст;
+# перевірка формату викликів інструментів на рушії 2.66.0 (на ньому gpt-oss ламала формат) і зору Q4 з більшим лімітом
+if [ "${SET:-1}" = 2 ]; then CONFIGS=(
+  "Q2 tuned|$Q2||2.66.0|131072|"
+  "Q4 tuned|$Q4|$Q36MM|2.66.0|131072|-ncmoe 26 -ub 2048 -b 2048"
+  "qwen3.8 MTP2 61440|$Q38|$Q38MM|2.66.0|61440|-ctk q8_0 -ctv q8_0 --spec-type draft-mtp --spec-draft-n-max 2"
+  "qwen3.8 MTP3 61440|$Q38|$Q38MM|2.66.0|61440|-ctk q8_0 -ctv q8_0 --spec-type draft-mtp --spec-draft-n-max 3"
+  "qwen3.8 MTP2 53248|$Q38|$Q38MM|2.66.0|53248|-ctk q8_0 -ctv q8_0 --spec-type draft-mtp --spec-draft-n-max 2"
+); fi
 say "== $(date '+%F %T') замір налаштувань 4 моделей; запити: 27k, 46k, 63k і «зсув вікна» на 46k"
 for c in "${CONFIGS[@]}"; do
   IFS='|' read -r name gguf mm ver ctx extra <<< "$c"
@@ -64,6 +73,17 @@ def show(tag, r, t):
     print(f"  {tag}: підказка {u.get('prompt_tokens')} ток., перечитано {tm.get('prompt_n')} за {tm.get('prompt_ms', 0) / 1000:.0f} с "
           f"({tm.get('prompt_per_second', 0):.0f} ток/с); відповідь {u.get('completion_tokens')} ток. {tm.get('predicted_per_second', 0):.1f} ток/с{acc}; "
           f"усього {time.time() - t:.0f} с", flush=True)
+    m = r["choices"][0]
+    tc = m["message"].get("tool_calls") or []
+    print(f"    формат: finish={m.get('finish_reason')}, викликів інструментів {len(tc)}"
+          + (f" ({', '.join(c['function']['name'] for c in tc)}, аргументи JSON: "
+             f"{all(ok(c['function']['arguments']) for c in tc)})" if tc else "")
+          + f", міркувань {len(m['message'].get('reasoning_content') or '')} симв.", flush=True)
+def ok(a):
+    try:
+        json.loads(a); return True
+    except ValueError:
+        return False  # обірвано лімітом max_tokens посеред виклику
 def prep(d):
     d = copy.deepcopy(d); d.update(stream=False, max_tokens=1200, seed=42); d.pop("stream_options", None); d.pop("model", None); return d
 for name in ("r27k", "r63k", "r46k"):
@@ -86,12 +106,13 @@ except Exception as e:
 if vision:
     b64 = base64.b64encode(open("/home/alex/v4_test/inputs/shop/design-landing.jpg", "rb").read()).decode()
     body = {"messages": [{"role": "user", "content": [{"type": "text", "text": "Опиши блоки цього макета зверху вниз, коротко."},
-            {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + b64}}]}], "max_tokens": 600,
+            {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + b64}}]}], "max_tokens": 2500,
             "chat_template_kwargs": {"reasoning_effort": "low"}}
     t = time.time()
     try:
         r = post(body, 900)
-        print(f"  зір (макет на CPU): {time.time() - t:.0f} с; «{(r['choices'][0]['message'].get('content') or '')[:100]}»", flush=True)
+        mm = r['choices'][0]['message']
+        print(f"  зір (макет на CPU): {time.time() - t:.0f} с; міркувань {len(mm.get('reasoning_content') or '')} симв.; «{(mm.get('content') or '')[:100]}»", flush=True)
     except Exception as e:
         print(f"  зір: ПОМИЛКА {e}", flush=True)
 PY
