@@ -407,7 +407,7 @@ stage=\"$sid\" з 2–3 частинами {title, result, check} і випра�
     done
 
     echo "== $(date '+%F %T') end $task $model $(( $(date +%s) - task_start ))s"
-    [ "$task" = shop ] && (cd "$wd" && docker compose down -v >/dev/null 2>&1)
+    [ "$task" = shop ] && (cd "$wd" && docker compose down -v --remove-orphans >/dev/null 2>&1; docker ps -aq --filter "name=^$(basename "$wd" | tr -cd "a-z0-9_-" | tr -d .)" | xargs -r docker rm -f >/dev/null 2>&1)
     mkdir -p "$STASH/$task"; [ -d "$wd" ] && mv "$wd" "$STASH/$task/"; wd_gone=
   done
   direct_stop
