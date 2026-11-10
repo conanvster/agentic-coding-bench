@@ -20,10 +20,10 @@ OUT="$D/results-$(date +%F-%H%M).txt"; PORT=1297
 say() { echo "$*" | tee -a "$OUT"; }
 Q2="$M/Qwen3.6-35B-A3B-GGUF/Qwen3.6-35B-A3B-UD-Q2_K_XL.gguf"; Q4="$M/Qwen3.6-35B-A3B-GGUF/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf"
 Q36MM="$M/Qwen3.6-35B-A3B-GGUF/mmproj-F16.gguf"; FL="$M/flint-GGUF/flint-UD-Q4_K_XL.gguf"
-Q38="$M/Qwen3.8-27B-GGUF/Qwen3.8-27B-UD-IQ4_XS.gguf"; Q38MM="$M/Qwen3.8-27B-GGUF/mmproj-F16.gguf"
+Q38="$M/Qwen3.8-27B-GGUF/Qwen3.8-27B-UD-IQ4_XS.gguf"; Q38Q3="$M/Qwen3.8-27B-GGUF/Qwen3.8-27B-UD-Q3_K_XL.gguf"; Q38I3="$M/Qwen3.8-27B-GGUF/Qwen3.8-27B-UD-IQ3_S.gguf"; Q38MM="$M/Qwen3.8-27B-GGUF/mmproj-F16.gguf"
 NG="--spec-type ngram-mod"                                                   # типово чернетка 48–64 токени
 NG16="--spec-type ngram-mod --spec-ngram-mod-n-min 8 --spec-ngram-mod-n-max 16"  # коротша — дешевша помилка для MoE
-Q4T="-ncmoe 26 -ub 2048 -b 2048"; FLT="-ncmoe 34 -ub 2048 -b 2048"; KV8="-ctk q8_0 -ctv q8_0"
+Q4T="-ncmoe 26 -ub 2048 -b 2048"; FLT="-ncmoe 34 -ub 2048 -b 2048"; KV8="-ctk q8_0 -ctv q8_0"; MTP="--spec-type draft-mtp --spec-draft-n-max 2 --spec-draft-n-ubatch 64"
 
 # назва | запити | gguf | mmproj | рушій | ctx | параметри
 CONFIGS=(
@@ -49,6 +49,15 @@ CONFIGS=(
   "Q4 native|q4|$Q4|$Q36MM|native|131072|$Q4T"
   "flint native|flint|$FL||native|131072|$FLT"
   "qwen3.8 native|q38|$Q38|$Q38MM|native|69632|$KV8"
+  # 10.11 (слово користувача): варіанти qwen3.8 менші за IQ4_XS — звільнене місце на контекст і MTP (голова MTP є в усіх)
+  # UD-Q3_K_XL 12,24 ГіБ (−1,03 від IQ4_XS ≈ +30 тис. контексту), UD-IQ3_S 11,21 ГіБ (−2,06 ≈ +60 тис.)
+  "qwen3.8 Q3_K_XL 98304|q38|$Q38Q3|$Q38MM|2.66.0|98304|$KV8 -ub 256 -b 2048"
+  "qwen3.8 Q3_K_XL MTP2 81920|q38|$Q38Q3|$Q38MM|2.66.0|81920|$KV8 -ub 256 -b 2048 $MTP"
+  "qwen3.8 Q3_K_XL MTP2 90112|q38|$Q38Q3|$Q38MM|2.66.0|90112|$KV8 -ub 256 -b 2048 $MTP"
+  "qwen3.8 IQ3_S 131072|q38|$Q38I3|$Q38MM|2.66.0|131072|$KV8 -ub 256 -b 2048"
+  "qwen3.8 IQ3_S MTP2 106496|q38|$Q38I3|$Q38MM|2.66.0|106496|$KV8 -ub 256 -b 2048 $MTP"
+  "qwen3.8 IQ3_S MTP2 114688|q38|$Q38I3|$Q38MM|2.66.0|114688|$KV8 -ub 256 -b 2048 $MTP"
+  "qwen3.8 IQ3_S MTP2 106496 native|q38|$Q38I3|$Q38MM|native|106496|$KV8 -ub 256 -b 2048 $MTP"
   "qwen3.8 2.66 ub256 MTP2 65536|q38|$Q38|$Q38MM|2.66.0|65536|$KV8 -ub 256 -b 2048 --spec-type draft-mtp --spec-draft-n-max 2 --spec-draft-n-ubatch 64"
 )
 say "== $(date '+%F %T') замір v2: серії з 30 справжніх кроків агента; $(nproc) потоків CPU, вільно оперативки $(awk '/MemAvailable/{print int($2/1048576)}' /proc/meminfo) ГБ"
