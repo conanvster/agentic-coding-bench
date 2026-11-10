@@ -1,0 +1,58 @@
+{
+  "model": "devstral-small-2-24b-instruct-2512",
+  "опис": "Mistral Devstral Small 2 24B (12.2025), Q4_K_M, 14,3 ГБ; на llama-server напряму без зору",
+  "sampling": {
+    "temperature": 0.15
+  },
+  "passback": null,
+  "graphs": "on",
+  "issues": [
+    {
+      "id": "devstral-role-alternation",
+      "symptom": "претест 5 (30.10): після стиснення історії OpenCode — два повідомлення асистента підряд; шаблон Mistral кидає «roles must alternate» → HTTP 500; OpenCode повторював запит 12 308 разів за 40 хв, бюджет згорів",
+      "workaround": "alternate_roles: true — proxy.py зливає сусідні повідомлення однієї ролі"
+    },
+    {
+      "id": "devstral-sampling",
+      "workaround": "картка mistralai/Devstral-Small-2-24B-Instruct-2512: temperature 0.15 у всіх прикладах; top_p/top_k не задано — типові"
+    },
+    {
+      "id": "devstral-gguf-template",
+      "symptom": "картка: спільнотні GGUF потребували змін з llama.cpp PR 17945",
+      "status": "ВІДКРИТО — перевірити виклики інструментів у претесті",
+      "link": "https://huggingface.co/mistralai/Devstral-Small-2-24B-Instruct-2512"
+    },
+    {
+      "id": "graphs",
+      "workaround": "graphs: on — Xid не бачили (правило: вимикати лише де був Xid)"
+    },
+    {
+      "id": "devstral-fit",
+      "symptom": "LM Studio: не вантажиться навіть з ctx 8192",
+      "workaround": "server: llama-server без mmproj, кеш K/V q4_0, ctx 36864",
+      "status": "стеля 30.10 (ctx_ceiling.sh, llama-server -np 1, запас 400 МіБ): f16 — 10240, q8_0 — 20480, q4_0 — 38912. Кеш q4_0 може трохи знижувати якість; контексту мало для довгих задач"
+    },
+    {
+      "id": "v4-vision",
+      "workaround": "v4: зір через mmproj на CPU (--no-mmproj-offload)",
+      "status": "ПЕРЕВІРИТИ: відеопам'ять і швидкість кодування скриншота до прогону"
+    }
+  ],
+  "результати": [
+    "претест 5 (30.10): етап 0 ✅ 2 хв; етап 1 — НЕ ЗАРАХОВУВАТИ: 12 308 відповідей 500 (чергування ролей у шаблоні) за 40 хв + зламаний Flask у ~/.local; виправлено alternate_roles — перепрогнати",
+    "претест 6 (30.10, alternate_roles): ✅ 3/3 за 13 хв (2+5+5), з 1-ї спроби; злиття ролей спрацювало 3 рази, 500 — 0; Flask + test_client, 6 тестів; приймання 9/11; немає DECISIONS.md і requirements.txt"
+  ],
+  "server": {
+    "kind": "llama-server",
+    "port": 1240,
+    "gguf": "lmstudio-community/Devstral-Small-2-24B-Instruct-2512-GGUF/Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf",
+    "args": [
+      "-ctk",
+      "q4_0",
+      "-ctv",
+      "q4_0"
+    ],
+    "mmproj": "lmstudio-community/Devstral-Small-2-24B-Instruct-2512-GGUF/mmproj-Devstral-Small-2-24B-Instruct-2512-F16.gguf"
+  },
+  "alternate_roles": true
+}

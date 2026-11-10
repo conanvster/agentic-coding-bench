@@ -1,0 +1,47 @@
+{
+  "model": "kat-coder-v2.5-dev-apex",
+  "опис": "KAT-Coder v2.5 dev (на Qwen3.6-35B-A3B), APEX I-Mini, 13,5 ГБ; без зору",
+  "sampling": {
+    "temperature": 0.6,
+    "top_p": 0.95,
+    "top_k": 20,
+    "min_p": 0.0,
+    "presence_penalty": 0.0
+  },
+  "passback": {
+    "field": "reasoning_content",
+    "keep": 6
+  },
+  "issues": [
+    {
+      "id": "kat-sampling",
+      "workaround": "збудовано на Qwen3.6-35B-A3B; у картці приклад t 1.0, спільнота міряла 0.6 як кращу в агенті"
+    },
+    {
+      "id": "graphs",
+      "symptom": "Xid у прогонах 28–29.10 не було",
+      "workaround": "graphs: on (слово користувача 29.10: не вимикати, де не було Xid); захист run-v3.sh — перезавантаження й незарахована спроба",
+      "status": "швидкість з графами / без: 98,9 / 96,3 ток/с (+2,7 %)"
+    },
+    {
+      "id": "direct-06-11",
+      "symptom": "05–06.11 kat у LM Studio: переповнення контексту приходить кодом 200 у SSE, проксі не обрізав, OpenCode падав oc=1 (8c.1 ×3 + поділ)",
+      "workaround": "v4.2: llama-server напряму (як gpt-oss/gemma), кеш K/V f16 як у LM Studio; проксі ловить переповнення за текстом; 06.11: напряму з f16 лишалось 212 МіБ відеопам'яті (Godot може впасти) → кеш K/V q8_0 (слово користувача)"
+    }
+  ],
+  "graphs": "on",
+  "результати": [
+    "претест 3: ✅ 3/3, 8 хв, усе з 1-ї спроби, 17 тис. токенів — найшвидша. Код: Flask, приймання 9/9, 6 тестів; nan/inf → 500 HTML"
+  ],
+  "server": {
+    "kind": "llama-server",
+    "port": 1242,
+    "gguf": "mudler/KAT-Coder-V2.5-Dev-APEX-GGUF/KAT-Coder-V2.5-Dev-APEX-I-Mini.gguf",
+    "args": [
+      "-ctk",
+      "q8_0",
+      "-ctv",
+      "q8_0"
+    ]
+  }
+}

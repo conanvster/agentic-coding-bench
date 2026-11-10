@@ -1,0 +1,71 @@
+{
+  "model": "openai/gpt-oss-20b",
+  "опис": "OpenAI gpt-oss 20B, MXFP4, 12,1 ГБ; без зору",
+  "sampling": {
+    "temperature": 1.0,
+    "top_p": 1.0,
+    "top_k": 0,
+    "min_p": 0.0
+  },
+  "reasoning_effort": "high",
+  "server": {
+    "kind": "llama-server",
+    "port": 1236,
+    "gguf": "lmstudio-community/gpt-oss-20b-GGUF/gpt-oss-20b-MXFP4.gguf"
+  },
+  "passback": {
+    "field": "reasoning_content",
+    "keep": 6
+  },
+  "issues": [
+    {
+      "id": "gptoss-effort-low",
+      "symptom": "відмова «не можу за одну відповідь» за 31 с (v1)",
+      "cause": "у LM Studio типовий reasoning_effort — low; OpenCode свій не передає (opencode#27361)",
+      "workaround": "reasoning_effort: high"
+    },
+    {
+      "id": "gptoss-harmony-header",
+      "symptom": "peg-native майже на кожному виклику інструмента в довгій сесії: «<|channel|>to=functions.write<|channel|>commentary…», «<|channel|>image<|message|>…»; повтор теж падає (24 повтори — 0 врятованих, 29.10)",
+      "cause": "НАШ обхід: міркування, підкладені в content повідомлення з викликом інструмента, ламають модель",
+      "workaround": "server: llama-server напряму (без LM Studio) + passback reasoning_content, keep 6",
+      "status": "29.10: через LM Studio — content 7/12, none 0/12, але в претесті 3 з passback null усе одно 6 зламаних запитів; напряму через llama-server (той самий рушій 2.28.2) на тих самих 12 запитах × 2 з випадковим seed: none 0/24, content 0/24, reasoning_content 0/24, і міркування доходять (prompt_tokens 17316 → 19720). Через LM Studio reasoning_content відкидається. Перевірити в претесті 4.",
+      "link": "https://github.com/ggml-org/llama.cpp/issues/27720",
+      "seen": "29.10 претест 2: 12 збоїв, 24 повтори проксі — 0 врятованих"
+    },
+    {
+      "id": "gptoss-one-tool",
+      "symptom": "з ОДНИМ інструментом у запиті — завжди peg-native",
+      "workaround": "у власних перевірках (check_models.py) давати ≥ 2 інструменти; OpenCode шле 10"
+    },
+    {
+      "id": "gptoss-reasoning-fields",
+      "symptom": "поля reasoning/reasoning_content/thinking у повідомленнях assistant LM Studio для gpt-oss відкидає (prompt_tokens не змінюються)",
+      "workaround": "поля reasoning_content/thinking LM Studio відкидає (prompt_tokens однакові з варіантом без міркувань — 13070), тож повертати міркування gpt-oss через LM Studio нема як; content — шкодить"
+    },
+    {
+      "id": "gptoss-edit",
+      "symptom": "edit: «Could not find oldString» у 22 з 62 викликів (v2)",
+      "workaround": "у підказці всім моделям (ABILITIES у run-v3.sh): перечитай і повтори коротшим фрагментом або перепиши файл через write"
+    },
+    {
+      "id": "graphs",
+      "symptom": "Xid за ~10 год роботи 28–29.10 не було",
+      "workaround": "graphs: on (слово користувача 29.10: не вимикати, де не було Xid)",
+      "status": "заміряно: різниця швидкості з графами і без 0 % (92,8 / 92,9 ток/с)"
+    },
+    {
+      "id": "gptoss-direct",
+      "symptom": "LM Studio для gpt-oss: (1) відкидає reasoning_content — модель не бачить своїх міркувань; (2) зламаний заголовок Harmony → HTTP 500",
+      "cause": "обробка Harmony у LM Studio (той самий llama-server напряму цих збоїв не дає)",
+      "workaround": "server → run-v3.sh запускає llama-server (lib-direct.sh) замість lms load, proxy.py шле запити моделі на його порт",
+      "status": "введено 30.10, перевірити в претесті 4",
+      "seen": "logs/peg-replay.tsv (мітка direct-2.28.2), logs/gptoss-direct.out"
+    }
+  ],
+  "graphs": "on",
+  "результати": [
+    "претест 3 (29.10, LM Studio, passback null): ✅ 3/3 етапи, 20 хв, 5 спроб, 114 тис. токенів; 6 запитів peg-native. Код: приймання 9/9, але тести перевіряють підробний _TestClient, а не справжній сервер; немає DECISIONS.md; nan/inf → 200 з невалідним JSON",
+    "претест 6 (30.10, llama-server напряму, passback reasoning_content 6): ✅ 3/3 за 13 хв (3+5+5), усе з 1-ї спроби, peg 0; тести через справжній HTTP-сервер (у претесті 3 — підробка); приймання 9/11 (nan/inf → 200 NaN); немає DECISIONS.md"
+  ]
+}
