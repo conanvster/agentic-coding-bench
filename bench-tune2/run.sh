@@ -88,7 +88,7 @@ def post(body, timeout=1800):
 def alive():
     try: os.kill(pid, 0); return True
     except OSError: return False
-pn = pms = gn = gms = dn = da = 0; t0 = time.time(); done = 0; maxp = 0
+pn = pms = gn = gms = dn = da = 0; calls = badj = leak = 0; t0 = time.time(); done = 0; maxp = 0
 for f in sorted(glob.glob(f"{rdir}/*.json")):
     d = json.load(open(f)); d.update(stream=False, max_tokens=600, seed=42)
     for k in ("stream_options", "model"): d.pop(k, None)
@@ -98,10 +98,17 @@ for f in sorted(glob.glob(f"{rdir}/*.json")):
         print(f"  ПАДІННЯ на кроці {done + 1}: {'сервер упав' if not alive() else e}", flush=True); break
     tm, u = r.get("timings", {}), r.get("usage", {})
     pn += tm.get("prompt_n", 0); pms += tm.get("prompt_ms", 0); gn += tm.get("predicted_n", 0); gms += tm.get("predicted_ms", 0)
+    msg = r["choices"][0]["message"]; fin = r["choices"][0].get("finish_reason")
+    for c in msg.get("tool_calls") or []:
+        calls += 1
+        try: json.loads(c["function"]["arguments"])
+        except ValueError: badj += fin != "length"   # обрив лімітом max_tokens — не вада моделі
+    leak += "<tool_call>" in (msg.get("content") or "")   # виклик текстом, який рушій не розпізнав
     dn += tm.get("draft_n", 0) or 0; da += tm.get("draft_n_accepted", 0) or 0; maxp = max(maxp, u.get("prompt_tokens") or 0); done += 1
 acc = f"; чернетки вгадано {da}/{dn} ({100 * da / max(1, dn):.0f} %)" if dn else ""
 print(f"  кроків {done}/30 за {time.time() - t0:.0f} с; найдовша підказка {maxp} ток.; перечитано {pn} ток. "
       f"({pn / max(1e-9, pms / 1000):.0f} ток/с); згенеровано {gn} ток. ({gn / max(1e-9, gms / 1000):.1f} ток/с){acc}", flush=True)
+print(f"  виклики інструментів: {calls}, з поламаним JSON {badj}, виклик текстом замість інструмента {leak}", flush=True)
 if vision and alive():
     b64 = base64.b64encode(open("/home/alex/v4_test/inputs/shop/design-landing.jpg", "rb").read()).decode()
     body = {"messages": [{"role": "user", "content": [{"type": "text", "text": "Опиши блоки цього макета зверху вниз, коротко."},
