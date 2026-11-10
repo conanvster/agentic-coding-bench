@@ -60,6 +60,8 @@ CONFIGS=(
   "qwen3.8 IQ3_S MTP2 106496 native|q38|$Q38I3|$Q38MM|native|106496|$KV8 -ub 256 -b 2048 $MTP"
   "qwen3.8 2.66 ub256 MTP2 65536|q38|$Q38|$Q38MM|2.66.0|65536|$KV8 -ub 256 -b 2048 --spec-type draft-mtp --spec-draft-n-max 2 --spec-draft-n-ubatch 64"
 )
+# CONFIGS_FILE=файл — варіанти з файлу (рядок = той самий формат), напр. від mtp-fit.sh; OUT_TAG — до назви файлу результатів
+if [ -n "${CONFIGS_FILE:-}" ]; then mapfile -t CONFIGS < <(grep -v '^\s*\(#\|$\)' "$CONFIGS_FILE"); OUT="$D/results-$(date +%F-%H%M)${OUT_TAG:+-$OUT_TAG}.txt"; fi
 say "== $(date '+%F %T') замір v2: серії з 30 справжніх кроків агента; $(nproc) потоків CPU, вільно оперативки $(awk '/MemAvailable/{print int($2/1048576)}' /proc/meminfo) ГБ"
 for c in "${CONFIGS[@]}"; do
   IFS='|' read -r name rq gguf mm ver ctx extra <<< "$c"
