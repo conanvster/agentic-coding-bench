@@ -21,7 +21,10 @@ while IFS='|' read -r model slug ctx opts; do
     [ -e "$T/$slug" ] && { echo "== СТОП: $T/$slug уже існує"; exit 1; }
     mv "$V/stash/shop/$slug" "$T/" || exit 1
   fi
-  [ -d "$T/$slug" ] || { echo "== СТОП: нема каталогу сайту $slug"; exit 1; }
+  case "$opts" in
+    *start=*) [ -d "$T/$slug" ] || { echo "== СТОП: нема каталогу сайту $slug для продовження"; exit 1; } ;;
+    *) [ -e "$T/$slug" ] && { echo "== СТОП: $slug стартує з нуля, а $T/$slug уже існує"; exit 1; } ;;
+  esac
 done < <(grep -v '^#' "$V/runs-full-shop-resume.txt" | grep .)
 avail=$(awk '/MemAvailable/{print int($2/1048576)}' /proc/meminfo); [ "$avail" -lt 18 ] && echo "== УВАГА: оперативки доступно $avail ГБ — закрий браузер (qwen3.6 Q4 потребує ≥ 15 ГБ)"
 setsid nohup "$V/tools/read-guard.py" > "$V/archive/read-guard.out" 2>&1 &
