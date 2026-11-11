@@ -103,6 +103,25 @@ wait_gpu_free() {  # → GPU_PAUSED (с), щоб зсунути початок �
 # витіснялись і читались з диска: 48 → 15–20 ток/с, замір нечесний. Перед спробою — чекати, поки доступно
 # ≥ min_ram_gb з правил моделі (до 2 год, як для GPU); пауза не йде в бюджет.
 ram_avail_gb() { awk '/MemAvailable/{print int($2/1048576)}' /proc/meminfo; }
+# 11.11 (слово користувача): у ніч на 11.11 диск переповнився кешем збирання Docker (моделі перезбирають образи з --no-cache) —
+# зламав етап 6 qwen3.6 Q4 і етап 2 qwen3.8 Q3_K_XL. Перед кожною спробою: < DISK_MIN_GB вільно → docker builder prune -af.
+# Якщо й після чистки < DISK_HARD_GB — пауза (не зараховується в бюджет), рядок у run.out раз на 30 хв (його бачить stand-watch).
+DISK_MIN_GB="${DISK_MIN_GB:-20}"; DISK_HARD_GB="${DISK_HARD_GB:-10}"
+disk_free_gb() { df -BG --output=avail / | tail -1 | tr -dc 0-9; }
+ensure_disk() {  # → DISK_PAUSED (с)
+  DISK_PAUSED=0
+  local f; f=$(disk_free_gb)
+  [ "$f" -ge "$DISK_MIN_GB" ] && return 0
+  docker builder prune -af >/dev/null 2>&1
+  echo "== $(date '+%F %T') мало місця: $f ГБ → почищено кеш збирання Docker, тепер $(disk_free_gb) ГБ"
+  local t0; t0=$(date +%s); local n=0
+  while [ "$(disk_free_gb)" -lt "$DISK_HARD_GB" ]; do
+    [ $((n % 60)) = 0 ] && echo "== $(date '+%F %T') ПАУЗА: на диску $(disk_free_gb) ГБ (< $DISK_HARD_GB) навіть після чистки — звільни місце"
+    n=$((n + 1)); sleep 30
+    docker builder prune -af >/dev/null 2>&1
+  done
+  DISK_PAUSED=$(( $(date +%s) - t0 ))
+}
 wait_ram_free() {  # need_gb → RAM_PAUSED (с)
   local need="$1" t0; t0=$(date +%s); RAM_PAUSED=0
   [ -z "$need" ] || [ "$need" = 0 ] && return 0
@@ -188,6 +207,8 @@ for run in "${RUNS[@]}"; do
   # правила моделі: model-rules/<файл>.json; 4-те поле runs-файлу (graphs=on|off) перекриває graphs з правил
   graphs=$(python3 "$V/model_rules.py" "$model" graphs 2>> "$LOGS/rules.err")
   case "${opts:-}" in *graphs=on*) graphs=on ;; *graphs=off*) graphs=off ;; esac
+  # 11.11: start=N у 4-му полі — продовжити цю модель з етапу N (перекриває START_STAGE лише для неї)
+  run_start=$(grep -o 'start=[0-9]*' <<< "${opts:-}" | cut -d= -f2)
   python3 "$V/model_rules.py" "$model" file | grep -q json \
     || echo "== $(date '+%F %T') УВАГА: для $model немає файлу правил — лише загальні (без рекомендованої вибірки)"
   lmsc unload --all >/dev/null 2>&1
@@ -251,7 +272,7 @@ for run in "${RUNS[@]}"; do
       sid="${q_ids[$qi]}"; title="${q_titles[$qi]}"; qi=$((qi + 1))
       # v4: START_STAGE=N — продовжити з етапу N (каталог моделі вже містить попередні етапи)
       snum=${sid%%[!0-9]*}  # 8a → 8
-      [ "$snum" -lt "${START_STAGE:-0}" ] && continue
+      [ "$snum" -lt "${run_start:-${START_STAGE:-0}}" ] && continue
       part_note=""
       [ "$sid" != "$snum" ] && [[ "$sid" != *.* ]] && part_note="
 Це ЧАСТИНА $sid етапу $snum (етап поділено на частини, щоб вмістився в пам'ять моделі): роби лише цю частину, наступні частини будуть окремими запусками. Пиши файл одразу й поступово (спершу мінімальний робочий варіант → запуск → доповнення), а не проєктуй усе в роздумах."
@@ -305,6 +326,7 @@ $ABILITIES
         if [ "$left" -le 0 ]; then echo "== бюджет $task вичерпано на етапі $sid (спроба $attempt)"; break; fi
         wait_gpu_free; task_start=$(( task_start + GPU_PAUSED ))
         wait_ram_free "$min_ram"; task_start=$(( task_start + RAM_PAUSED ))
+        ensure_disk; task_start=$(( task_start + DISK_PAUSED ))
         left=$(( budget - ($(date +%s) - task_start) ))
         OC_CAP=$(( left < STAGE_CAP ? left : STAGE_CAP ))
         st=$(date +%s); st_h=$(date '+%F %T')
