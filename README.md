@@ -1,74 +1,149 @@
-# Стенд v4 (01.11.2026)
+# Agentic coding bench for local LLMs
 
-Стенд для агентної розробки на локальних моделях. Зроблено з opencode-v3 після аналізу гри: `~/стенд-кодингу/opencode-v3/АНАЛІЗ-ГРА.md`, також є в хабі в `agentic-model-tests/`.
+A test stand that measures how well **local** language models (16 GB GPU class) do real
+agentic software development: the model works through [OpenCode](https://opencode.ai) on a
+multi-stage task, and every stage is accepted or rejected by an automatic gate — not by the
+model's own report.
 
-## Що змінилось проти v3 (однаково для всіх моделей)
+What is tested is the pair *model + hardware*: each model runs with the largest context and
+the best sampler settings that this machine allows, found by pretests before the main run.
 
-| Що | Навіщо (дані v3) |
+Scripts, comments and the change history ([CHANGELOG.md](CHANGELOG.md),
+[README-v4.1.md](README-v4.1.md)) are in Ukrainian.
+
+## How it works
+
+```
+run-v4.sh ── for each model in runs-*.txt
+   │   load model (LM Studio, or llama-server directly — per model-rules/)
+   │   for each stage in stages-<task>.txt
+   │       OpenCode session ──► proxy.py ──► model
+   │            │   MCP tools: tools/stand_tools.py (read_lines / edit_lines / write_file /
+   │            │              godot_run / stage_check / split_stage)
+   │       gate.py <task> <stage>   ✓ → next stage    ✗ → retry with the gate output
+   │       3 failed attempts or 2 attempts with no file changes → the model splits the stage
+   └── logs/meta.tsv, logs/proxy.tsv, logs/run.out
+```
+
+| Part | Role |
 |---|---|
-| Робочі каталоги `/home/alex/v4_test/<задача>/<модель>`, вхідні файли `/home/alex/v4_test/inputs/<задача>/` (латиницею; ТЗ — лише шляхи й імена файлів). Заборона в opencode.json лише на `*v4_stand*` | кирилиця й лапки в шляхах; iq4_xs вирішила, що перевірка заборонена (правило *opencode-v3*) |
-| MCP-сервер `tools/stand_tools.py`: `read_lines`/`edit_lines` (якорі `12:a3f\|`), `write_file` (перевірка синтаксису одразу), `godot_run`, `stage_check` | 15 зламаних edit у gemma-12b, 267 heredoc і зіпсований файл у qwen3.5-9b, вигаданий формат .tscn у devstral |
-| `godot_run play`: копія проєкту + автозавантаження `tools/probe.gd` → скриншоти, звіт «що бачить камера», EMPTY/UNIFORM | жодна модель не бачила, що екран сірий |
-| Вікна помилок Godot (OS.alert → zenity) перехоплює `tools/alert-shim/` і віддає текстом | вікно блокує Godot, а модель його не бачить |
-| `bin/godot`: ліміт 90 с, `--quit-after` для -s/--headless, підказка про quit() | gpt-oss 5164 с і gemma-26b 4685 с бюджету — зависання до таймауту 120 с |
-| proxy.py: запобіжник циклу — 3 однакові виклики поспіль → попередження в результаті останнього виклику (`loop` у proxy.tsv) | qwen3.6 записала той самий файл 92 рази |
-| Зір: opencode.json `attachment`/`modalities` для моделей із зором; llama-server — `mmproj` на CPU | iq4_xs, gemma, qwen3.5-9b, devstral мають зір, але не використовували |
-| gate.py: падіння Godot і код виходу — ✗; етапи 3–7 гри: порожній екран — ✗ | діри 1–2 v3 (kat 0–7 за стендом, чесно 0–2) |
-| Результати лишаються в `stash/` (не повертаються в робочий каталог) | пастка v3: наступна модель бачила чужі каталоги |
+| `run-v4.sh` | Runner: model loading, stage queue, attempts, budgets, stage splitting, locks |
+| `gate.py`, `bin/stage-check` | Stage acceptance. Each check prints `✓ what` or `✗ what — how to fix` |
+| `proxy.py` | Proxy between OpenCode and the model: loop guard (3 identical tool calls), context-overflow trimming, per-model fixes, request log |
+| `tools/stand_tools.py` | MCP server with tools that give clear errors and an example of a correct call |
+| `tools/probe.gd`, `bin/godot`, `tools/alert-shim/` | Running a Godot game without hangs: screenshots, scene report (empty / washed-out / blocked view), error dialogs returned as text |
+| `model-rules/*.json`, `model_rules.py` | One file per model: sampler, server flags, known issues with symptom and workaround |
+| `runs-*.txt` | Which models to run: `model key|slug|context` |
+| `stages-*.txt` | Stages of a task: `N|what must exist after this stage` |
+| `bases/` | Shared starting point for staged tests (stages 0–2 already done) |
+| `qa/` | Independent checks after a run |
+| `status.sh`, `stand-watch.py`, `orphan-guard.py` | Live status, phone notifications, cleanup of orphaned processes |
 
-Зір: iq4_xs, gemma-4-26b, gemma-4-12b, qwen3.5-9b, devstral. Без зору: gpt-oss, qwen3.6, kat. Моделі без зору отримують той самий текстовий звіт сцени.
+Tasks: `pre` (small HTTP service in Docker), `shop` (full-stack web shop: API, frontend,
+Prisma, Playwright), `gra` (3D shooting-range game in Godot with Blender-scripted models).
 
-## Перевірено без моделей (01.11)
-- `godot_run play`: iq4_xs — 91 сітка в кадрі, справжній скриншот; qwen3.5-9b — 0 сіток, EMPTY/UNIFORM; devstral — помилка розбору main.tscn:3.
-- Вікно «no main scene» і «script doesn't inherit SceneTree» перехоплено текстом.
-- `edit_lines`: якорі, зсув рядків, таби, перевірка GDScript; `write_file` .tscn — розбір Godot.
-- gate.py етап 3: iq4_xs ✓, qwen3.5-9b ✗ порожньо, kat ✗ порожньо, gpt-oss ✗ падіння — збігається з ручною перевіркою.
-- `opencode mcp list` з цим конфігом — stand connected.
-- loop_guard — модульна перевірка (3 однакові → попередження; різні або після повідомлення користувача → ні).
+## Requirements
 
-## Ще НЕ перевірено
-- Справжній прогін OpenCode з інструментами MCP (димовий: runs-v4-smoke.txt).
-- mmproj на CPU: відеопам'ять і час кодування скриншота (iq4_xs, devstral, gemma-26b Q4_0).
-- Задачі pre і shop: вхідні файли ще не підготовлено (`inputs/pre`, `inputs/shop`).
+Linux, NVIDIA GPU, Python 3, Docker, `flock`; OpenCode 1.19.5; LM Studio (`lms` CLI) and/or
+`llama-server` from llama.cpp (`tools/build-llama-native.sh` builds one for the local CPU);
+Godot 4 and Blender for the `gra` task.
 
-## Запуск (з `su - alex`, коли v3 не працює — run-v4.sh сам перевіряє замок v3)
-    GRA_BUDGET=2400 RUNS_FILE=/home/alex/v4_stand/runs-v4-smoke.txt nohup /home/alex/v4_stand/run-v4.sh > /home/alex/v4_stand/logs/run.out 2>&1 &
-    /home/alex/v4_stand/status.sh -f
+Paths are hard-coded: the stand lives in `/home/alex/v4_stand`, models work in
+`/home/alex/v4_test/<task>/<slug>`, task specifications are read from
+`/home/alex/v4_test/inputs/<task>/TZ.md`. Change `V` and `T` at the top of the scripts for
+another machine. The task specifications themselves are not part of this repository.
 
-## Рішення за прогоном iq4_xs (01–03.11) — діють для всіх наступних моделей
+## Testing a model, step by step
 
-Проти зациклювань і переповнення:
-| Що | Чому (дані iq4_xs) | Де |
+Only one run can use the GPU at a time; every script refuses to start if another run is
+active, if `logs/` still holds the previous run, or if a foreign process occupies the GPU.
+
+### 1. Describe the model
+
+Add `model-rules/<slug>.json` (sampler from the model card, `server` block if the model
+should run on llama-server directly, known issues) and a line in a runs file:
+
+```
+qwen3.8-27b@iq4_xs|qwen3.8-27b-iq4-xs|69632
+```
+
+### 2. Pretest: does it fit and how fast is it (~5 min of GPU per model)
+
+```bash
+MODELS="<model key>" ./pretest-direct-v42.sh   # start on llama-server, ~100k-token prompt, free VRAM, speed
+./pretest-moe-v42.sh                           # MoE models larger than VRAM: smallest -ncmoe N that survives
+```
+
+Set the context in the runs file to the largest value that leaves a VRAM reserve.
+
+### 3. Pretest: does it understand the task (15–30 min per model)
+
+```bash
+./pretest-shop-v44.sh      # vision probe on a design mock-up + stages 0–1 of the shop task, 15 min per model
+./pretest30-shop-v44.sh    # the same stages with 30 min, for models that ran out of time
+```
+
+Results go to `archive/pretest-shop-v44-<time>/`: `vision-<slug>.txt` and the run logs.
+A model that fails the pretest is excluded from the full run.
+
+If a model loops in its reasoning, replay the captured requests with different samplers
+and put the winner into its rules file:
+
+```bash
+python3 qa/replay_loops.py --port 1251 --dumps <req dir> --runs 2 --name dry \
+        --extra '{"dry_multiplier":0.8,"dry_base":1.75,"dry_allowed_length":4}'
+```
+
+### 4. Smoke run
+
+Two or three cases once, to check the stand rather than the model: tools are called,
+screenshots reach a vision model, the loop guard writes to `proxy.tsv`, the gate works.
+
+```bash
+GRA_BUDGET=2400 RUNS_FILE=$PWD/runs-v4-smoke.txt nohup ./run-v4.sh > logs/run.out 2>&1 &
+./status.sh -f
+```
+
+### 5. Full run
+
+```bash
+./start-shop-v44.sh        # shop task, 6 h per model, stage cap 1.5 h
+./start-stage3.sh          # staged test: every model starts from the same base (bases/)
+./status.sh -f             # stages passed, current model and stage, time against budget
+```
+
+Main knobs of `run-v4.sh` (environment variables):
+
+| Variable | Default | Meaning |
 |---|---|---|
-| Переповнення контексту ловить проксі: 400 «exceeds the available context size» → обрізати найбільший вивід інструмента з приміткою «[СТЕНД] Вивід обрізано… читай частинами», до 3 разів | OpenCode 1.19.5 не розпізнає цю помилку й повторює запит безкінечно: 20 419 відповідей 400 за 2 год, +3,6 ГБ дампів | proxy.py `shrink_for_context` |
-| Запобіжник циклу: 3 однакові виклики поспіль → попередження | (з v4 від початку) за 2 дні не спрацював жодного разу | proxy.py |
-| Контекст — максимум, що влазить у VRAM (кеш q8_0, mmproj на CPU); для iq4_xs 69 632 | 57k → 11 стискань за 1,5 год | opencode.json, runs-*.txt |
-| **Стоп «ПОТРІБЕН ПОДІЛ»**: 2 спроби поспіль без жодної зміни у файлах (коміт + git status/diff, без .stand/) → прогін моделі зупиняється | на 8a модель 2 спроби лише перечитувала файли, стиснення контексту стирало прочитане | run-v4.sh `wd_fp`, `NOPROG_MAX` (2) |
-| **v4.1 (04.11): модель сама ділить етап** — після ATTEMPTS (3) невдалих спроб або 2 спроб без змін стенд відкриває сесію поділу: модель викликає `stand_split_stage` з 2–3 частинами {title, result, check}; етап у черзі замінюється частинами 3.1, 3.2 …, застрягла частина ділиться далі (3.1 → 3.1.1, 3.1.2). Проміжна частина зараховується своєю командою check + Godot без помилок + перегляд гри + розділ «Етап 3.1» у PROGRESS + **коміт без незакомічених змін**; остання частина на рівні проходить і перевірки батьків, остання на всіх рівнях — повну перевірку етапу. Межі: глибина 3, 8 поділів на задачу; далі — стоп «ПОТРІБЕН ПОДІЛ» для людини | слово користувача 04.11: «якщо 3 зависання — щоб він сам дробив»; gpt-oss 04.11 застрягла на етапі 3 (172 правки однієї сцени) | run-v4.sh (черга q_ids, SPLIT_DEPTH, SPLIT_MAX, SPLIT_CAP), tools/stand_tools.py `split_stage`, split_info.py, gate.py (PART, PART_CHECKS) |
-| **Принцип: модель у своїх лімітах не дає результату → дробити етап**, а не нарощувати підказки. Кожна частина — один перевірний крок зі своїм gate. Готовий код/каркас не давати | етап 8 цілком і на 4 частини — 0 файлів за 3 год; на 6 частин — увесь етап 8 + 9 за 5,6 год | stages-*.txt, gate.py |
-| Частини етапу — `8a`…`8f`: прогін бере номер до літери, промпт додає «Це ЧАСТИНА…: роби лише цю частину, пиши файл одразу й поступово»; повна перевірка етапу лише на останній частині (`LAST_SUB`, типово f) | | run-v4.sh, gate.py |
-| Демон LM Studio не успадковує дескриптори замків (`lmsc` з `8>&-`, `daemon up … 8>&- 9>&-`) | llmster тримав замок v3 → «СТОП: іде прогін v3» | run-v4.sh, lib-graphs.sh |
-| STAGE_CAP 5400 (1,5 год на спробу) для частин етапу | частини йдуть 7–50 хв; довше — ознака застрягання | start-*.sh |
+| `TASKS` | `gra` | `pre`, `shop`, `gra` |
+| `RUNS_FILE` | `runs-v4.txt` | models to run |
+| `MODELS_ONLY` | — | restrict to listed slugs |
+| `STAGES_FILE` | `stages-<task>.txt` | alternative stage list |
+| `PRE_BUDGET` / `SHOP_BUDGET` / `GRA_BUDGET` | 3000 / 9000 / 9000 s | time budget per model |
+| `STAGE_CAP` | 2700 s | time per attempt |
+| `ATTEMPTS` | 3 | attempts per stage before splitting |
+| `NOPROG_MAX` | 2 | attempts without file changes before splitting |
+| `SPLIT_DEPTH` / `SPLIT_MAX` | 3 / 8 | limits of stage splitting |
+| `START_STAGE`, `BASE_DIR` | — | resume from a stage / start from a shared base |
 
-Реалізація гри (етап 8 тепер у `stages-gra.txt` на 6 частин; оригінал — archive/iq4-day2c-2026-11-02/stand-files/stages-gra.txt.orig-8-whole):
-- 8a каркас: справжня main.tscn у вікні, без vsync, --seed, фіксований крок, `event=start`, `start.png`, чистий вихід;
-- 8b одне влучання: наведення подіями миші (`Input.parse_input_event`), постріл кліком, перевірка HUD, `hit_01.png`;
-- 8c 5 влучань поспіль, `hit_01…05`; 8d промах + падіння; 8e Game Over, рестарт, пауза, `game_over.png`;
-- 8f референс (`main_like_reference.png`, `compare.py` → `side_by_side.png`), 3 стабільні прогони, усі пункти плану.
+### 6. After the run
 
-Відомі діри перевірки (лишились, виправити до порівняння моделей):
-- gate не бачить «вибіленого» світу: у iq4_xs на всіх кадрах білий фон без землі/столу/горизонту, а звіт моделі ставить ✅ (перевіряються лише сітки в кадрі);
-- грабельність не перевіряється: куби пачкою по 8 і видимі ~1,3 с — сценарний тест наводиться за координатами й цього не бачить;
-- шрифт HUD («PAXYHOK», «ПАТРОН :») — перевірка шукає текст у вузлі, а не на кадрі.
+Move `logs/` to `archive/<name>/` (each run keeps its own versioned directory; old numbers
+are never overwritten), then check the results independently of the model's report:
 
-## v4.2 (06.11.2026) — за розбором kat (слово користувача: «(в) обидва варіанти»)
-- **Переповнення від LM Studio**: LM Studio віддає «request exceeds the available context size» кодом 200 у потоці SSE —
-  proxy.py обрізав лише при 400; тепер ловить за текстом. kat і qwen3.6 переведено на llama-server напряму
-  (model-rules `server`, порти 1242/1243, кеш K/V f16 як у LM Studio). Перевірка старту — pretest-direct-v42.sh.
-- **Звіт godot_run (probe.gd)**: `LOST PARENTS` (вузли з неіснуючим parent= — Godot чіпляє їх до кореня як «Батько#Вузол»
-  і губить зміщення батька), `FRAME COVERAGE` (32×18 променів: що заповнює кадр і на якій відстані), `BLOCKED VIEW`
-  (одна сітка > 50 % кадру ближче 1 м). Рядки Godot «has vanished when instantiating» — у списку помилок.
-- **gate.py**: ✗ на втрачених батьків (godot_clean) і в scene_visible — ✗ на WASHED OUT, BLOCKED VIEW, LOST PARENTS
-  (раніше WASHED OUT був лише рядком у звіті). Перевірено: kat (стан 06.11) → 3 ✗; сцена iq4_xs → лише WASHED OUT (справді біла).
-- Порівнювати з v4.1 окремо. Бекап v4.1 — archive/stand-v4.1-2026-11-06.
-- Повтор kat з етапу 4 на копії після етапу 3 — start-kat-r2.sh (slug kat-coder-v2.5-r2); qwen3.6 з нуля — start-qwen36.sh.
+```bash
+SRC=<dir with model results> qa/check-pre.sh     # pre task: own tests, docker build, black-box acceptance
+qa/shot-gra.sh <model work dir> <out dir>        # gra task: screenshots of the game for manual review
+```
+
+`check_pretest.sh`, run inside a model's `pre` result, builds the image and checks the
+service with numbers that are not in the specification.
+
+## Design principles
+
+- The gate decides, not the model: crashes, empty or washed-out screens and uncommitted work fail a stage.
+- Same conditions for all models; per-model differences only in `model-rules/` with the reason recorded.
+- A model that cannot finish a stage within its limits gets a smaller stage, not more hints or ready code.
+- Models may not read the stand's own directory, so they cannot tune answers to the gate.
+- Every rule in the stand comes from an observed failure; the data behind each one is in [CHANGELOG.md](CHANGELOG.md).
