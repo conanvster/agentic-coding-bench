@@ -1,6 +1,6 @@
 {
   "model": "qwen3.8-27b@iq4_xs",
-  "опис": "Qwen3.8 27B, UD-IQ4_XS, 15,2 ГБ; на llama-server напряму без зору (LM Studio з mmproj не вантажить навіть 8192)",
+  "опис": "Qwen3.8 27B, UD-IQ4_XS, 15,2 ГБ; llama-server напряму, кеш K/V q8_0, контекст 69 632, зір на CPU (mmproj, --no-mmproj-offload; у LM Studio з mmproj не вантажилась навіть 8192)",
   "sampling": {
     "temperature": 1.0,
     "top_p": 0.95,

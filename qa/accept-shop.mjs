@@ -178,6 +178,19 @@ await tryRec('4.3', 'Стан у URL: фільтр + сортування пер
   await page.goBack({ waitUntil: 'networkidle' }); await page.waitForTimeout(800); const u2 = page.url();
   return [u1 !== u0 && checked && u2 !== u1, `${new URL(u1).search} → назад ${new URL(u2).search || '(без фільтрів)'}`];
 });
+// 17.11 (зі сліпої рецензії): OR усередині групи — після вибору RPG інші жанри лишаються доступними з лічильником > 0,
+// а вибір другого жанру розширює видачу (фасет групи рахується без самої групи)
+await tryRec('4.3', 'Жанри — OR усередині групи: після RPG жанр RTS лишається з лічильником > 0, RPG+RTS дає більше ігор', async () => {
+  await go('/catalog'); await (await genre(page, 'RPG')).click(); await page.waitForTimeout(1200);
+  const grid = async () => page.getByRole('button', { name: /Quick View/i }).evaluateAll((bs) => bs.filter((el) => { for (let e = el.parentElement; e; e = e.parentElement) { const ox = getComputedStyle(e).overflowX; if ((ox === 'auto' || ox === 'scroll' || ox === 'hidden') && e.scrollWidth > e.clientWidth + 4) return false; } return true; }).length);
+  const n1 = await grid();
+  const rts = await genre(page, 'RTS'); const vis = await rts.count();
+  const label = vis ? (await rts.innerText()).replace(/\s+/g, ' ') : '';
+  const cnt = parseInt((label.match(/(\d+)\s*\)?\s*$/) || [0, 0])[1], 10);
+  if (!vis) return [false, `після вибору RPG мітки «RTS» не видно (група звужується сама собою)`];
+  await rts.click(); await page.waitForTimeout(1500); const n2 = await grid();
+  return [cnt > 0 && n2 > n1, `RTS після RPG: «${label}»; карток RPG ${n1} → RPG+RTS ${n2}`];
+});
 await tryRec('4.3', '«Скинути все» очищає фільтри', async () => {
   await go('/catalog'); await (await genre(page, 'RPG')).click(); await page.waitForTimeout(1000);
   const b = page.getByRole('button', { name: /Скинути все/ }).first(); await b.click(); await page.waitForTimeout(1000); const u = new URL(page.url());
@@ -253,6 +266,29 @@ await tryRec('4.5', '«Купити як подарунок»: з\'являєт�
   await gp.getByText(/Купити як подарунок/).first().click(); await gp.waitForTimeout(800); const after = await gp.locator('input[type="email"]').count();
   if (after > before) { await gp.getByText(/Купити як подарунок/).first().click(); await gp.waitForTimeout(500); }
   return [after > before, `полів email ${before} → ${after}`];
+});
+// 17.11 (зі сліпої рецензії): зняти «подарунок» — позиція лишається в кошику
+await tryRec('4.5', 'Зняти «Купити як подарунок» (з email) — позиція лишається в кошику', async () => {
+  const items = async () => gp.locator('main').getByText(/Цифровий ключ/).count();
+  const n0 = await items();
+  await gp.getByText(/Купити як подарунок/).first().click(); await gp.waitForTimeout(800);
+  const mail = gp.locator('main input[type="email"]').first(); if (await mail.count()) { await mail.fill('friend@example.com'); await mail.press('Enter'); }
+  await gp.waitForTimeout(800);
+  const save = gp.locator('main').getByRole('button', { name: /Зберег|Підтверд|Застосувати подарунок|^\s*OK\s*$|Готово/ }).first(); if (await save.count()) await save.click();
+  await gp.waitForTimeout(1500); const isGift = /Подарунок для|friend@example\.com/.test(await B()) || (await mail.inputValue().catch(() => '')) === 'friend@example.com';
+  const off = gp.locator('main').getByRole('button', { name: /Не як подарунок|Скасувати подарунок/ }).first();
+  if (await off.count()) await off.click(); else await gp.getByText(/Купити як подарунок/).first().click();
+  await gp.waitForTimeout(2000);
+  await gp.reload({ waitUntil: 'networkidle' }); await gp.waitForTimeout(800); const n1 = await items(); const c = await gcount();
+  return [isGift && n1 === n0 && n0 > 0, `подарунок ${isGift ? 'збережено' : 'НЕ збережено'}; позицій ${n0} → ${n1} після зняття подарунка; лічильник ${c}`];
+});
+// 17.11: кешбек — 5 % від «Разом до оплати», округлення вниз до цілої монети (1 монета = 1 ₴)
+await tryRec('4.5', 'Кешбек = ⌊5 % від «Разом до оплати»⌋ цілими монетами', async () => {
+  const t = await B(); const num = (x) => parseInt(String(x).replace(/[\s  ]/g, ''), 10);
+  const tot = t.match(/Разом до оплати[:\s]*([\d\s  ]+)\s*₴/); const coins = t.match(/\+\s*([\d\s  ]+)\s*ігрових монет/);
+  if (!tot || !coins) return [false, 'не знайдено «Разом до оплати» або «+N ігрових монет»'];
+  const want = Math.floor(num(tot[1]) * 5 / 100); const want2 = Math.floor((num(tot[1]) + 1) * 5 / 100); // «Разом» показано без копійок
+  return [num(coins[1]) === want || num(coins[1]) === want2, `разом ${num(tot[1])} ₴ → монет ${num(coins[1])}, очікувано ${want}`];
 });
 await tryRec('4.6', 'Checkout: банер «Демо-режим», 3 способи, без полів картки', async () => {
   await gp.getByRole('button', { name: /Оформити замовлення/ }).or(gp.getByRole('link', { name: /Оформити замовлення/ })).first().click(); await gp.waitForLoadState('networkidle'); await gp.waitForTimeout(600);

@@ -4,7 +4,9 @@
 # Перевіряє: ціни з клієнта ігноруються, ідемпотентність POST /api/orders, порожній кошик → відмова,
 # rate-limit промокодів і підписки, маскування ключів/email у логах api, Postgres не опублікований назовні.
 V="${1:?a|b}"; B="${2:-http://localhost:8088}"; J=$(mktemp -d); ok=0; all=0
-r() { all=$((all+1)); if [ "$2" = 1 ]; then ok=$((ok+1)); echo "✓ $1${3:+ — $3}"; else echo "✗ $1${3:+ — $3}"; fi; }
+# r <назва> <1 або порожньо> <примітка>; якщо статус порожній і не взятий у лапки, примітка зсувається на місце статусу
+r() { all=$((all+1)); local st="$2" note="${3:-}"; [ $# -eq 2 ] && [ "$st" != 1 ] && { note="$st"; st=""; }
+  if [ "$st" = 1 ]; then ok=$((ok+1)); echo "✓ $1${note:+ — $note}"; else echo "✗ $1${note:+ — $note}"; fi; }
 c() { curl -s -b "$J/ck" -c "$J/ck" "$@"; }
 if [ "$V" = a ]; then add='{"gameSlug":"neon-horizon-2088","platform":"Steam","priceCents":1,"discountPct":99}'; addp=/api/cart/items; pm='"payMethod":"card"'
 else add='{"slug":"neon-horizon-2088","platform":"Steam","priceCents":1,"discountPct":99}'; addp=/api/cart; pm="\"paymentMethod\":\"${PM:-CARD_DEMO}\""; fi
@@ -19,6 +21,14 @@ n1=$(echo "$o1" | grep -oE 'CS-2026-[0-9]{6}' | head -1); n2=$(echo "$o2" | grep
 r "Idempotency-Key: повтор дає те саме замовлення" $([ -n "$n1" ] && [ "$n1" = "$n2" ] && echo 1) "$n1 / $n2"
 key2="acc2-$(date +%s%N)"; e=$(c -o /dev/null -w '%{http_code}' -H 'content-type: application/json' -H "Idempotency-Key: $key2" -d "$body" "$B/api/orders")
 r "порожній кошик → відмова (4xx)" $([ "${e:0:1}" = 4 ] && echo 1) "$e"
+# 17.11 (зі сліпої рецензії): два одночасні запити з тим самим Idempotency-Key — обидва успішні, одне замовлення, без 500
+c -o /dev/null -H 'content-type: application/json' -d "$add" "$B$addp"
+key3="acc3-$(date +%s%N)"
+(c -o "$J/p1" -w '%{http_code}' -H 'content-type: application/json' -H "Idempotency-Key: $key3" -d "$body" "$B/api/orders" > "$J/c1") &
+(c -o "$J/p2" -w '%{http_code}' -H 'content-type: application/json' -H "Idempotency-Key: $key3" -d "$body" "$B/api/orders" > "$J/c2") &
+wait
+p1=$(grep -oE 'CS-2026-[0-9]{6}' "$J/p1" | head -1); p2=$(grep -oE 'CS-2026-[0-9]{6}' "$J/p2" | head -1)
+r "одночасні запити з тим самим Idempotency-Key → одне замовлення, без 500" $([ "$(cat $J/c1)" -lt 300 ] && [ "$(cat $J/c2)" -lt 300 ] && [ -n "$p1" ] && [ "$p1" = "$p2" ] && echo 1) "коди $(cat $J/c1)/$(cat $J/c2); $p1 / $p2"
 k=$(echo "$o1" | grep -oE 'DEMO-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}' | head -1)
 logs=$(docker compose logs api 2>/dev/null)
 leak=0; [ -n "$k" ] && echo "$logs" | grep -qF "$k" && leak=1; echo "$logs" | grep -qF 'buyer@example.com' && leak=$((leak+2))
