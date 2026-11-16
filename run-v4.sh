@@ -31,6 +31,9 @@ TASKS="${TASKS:-gra}"
 MODELS_ONLY="${MODELS_ONLY:-}"
 RUNS_FILE="${RUNS_FILE:-$V/runs-v4.txt}"
 export OPENCODE_CONFIG="$V/opencode.json"
+# 16.11 (слово користувача): opencode підмішував у кожен запит ~/.claude/CLAUDE.md власника (hubjob, адреса хаба) — моделі
+# викликали hubjob самі. Вимикаємо сумісність із Claude Code: ні ~/.claude/CLAUDE.md, ні ~/.claude/skills.
+export OPENCODE_DISABLE_CLAUDE_CODE=1
 # stage-check (перевірка етапу) — без шляху до стенду в підказці; читати каталог стенду моделям заборонено в opencode.json
 export PATH="$V/bin:$PATH"
 mkdir -p "$LOGS" "$STASH"

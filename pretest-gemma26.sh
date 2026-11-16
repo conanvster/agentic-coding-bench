@@ -75,7 +75,7 @@ done
 P="$OUT/smoke-project"; mkdir -p "$P"
 rsync -a --exclude build --exclude .git --exclude .userdata --exclude .stand "$V/stash/gra/qwen3.8-27b-iq4-xs/" "$P/"  # без збірок (гра — 2,2 ГБ)
 python3 "$V/proxy.py" "$OUT/proxy.tsv" & proxy_pid=$!; sleep 2
-( cd "$P" && V4_WORKDIR="$P" V4_VISION=1 OPENCODE_CONFIG="$V/opencode.json" PATH="$V/bin:$PATH" \
+( cd "$P" && V4_WORKDIR="$P" V4_VISION=1 OPENCODE_CONFIG="$V/opencode.json" OPENCODE_DISABLE_CLAUDE_CODE=1 PATH="$V/bin:$PATH" \
   timeout 900 opencode run --auto --format json -m "lmv4/$MODEL" \
   "Call the tool stand_godot_run with mode=play exactly once. Then, without calling any other tool, describe in 3 sentences what you SEE on the screenshot image you received: colours, ground, horizon, objects. If you did not receive an image, say NO IMAGE." \
   < /dev/null > "$OUT/smoke.jsonl" 2> "$OUT/smoke.stderr" )

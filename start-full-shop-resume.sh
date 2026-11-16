@@ -35,7 +35,7 @@ nohup bash -c '
 V=/home/alex/v4_stand
 # 14.11: під hubjob — на телефон «завершено/помилка», а «завис», якщо 30 хв нема ні запитів (proxy.tsv), ні рядків run.out
 hj=(); command -v hubjob >/dev/null && hj=(hubjob --назва "стенд shop '"$PART"'" --тиша 30 --журнал "$V/logs/proxy.tsv" --)
-MODEL_RULES="$V/model-rules-full" TASKS=shop SHOP_BUDGET=604800 STAGE_CAP=86400 RUNS_FILE="'"$RUNS"'" \
+MODEL_RULES="$V/model-rules-full" TASKS=shop SHOP_BUDGET=604800 STAGE_CAP="${STAGE_CAP:-86400}" RUNS_FILE="'"$RUNS"'" \
   "${hj[@]}" "$V/run-v4.sh" > "$V/logs/run.out" 2>&1
 kill '"$guard"' 2>/dev/null
 a="$V/archive/full-shop-$(date +%F-%H%M)-'"$PART"'"; mkdir -p "$a/sites" && mv "$V/logs" "$a/logs" && mkdir -p "$V/logs"

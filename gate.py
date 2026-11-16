@@ -459,6 +459,30 @@ def committed():
         ok("є коміти" + ("" if not st.strip() else " (є незакомічені зміни — закоміть наприкінці етапу)"))
 
 
+# 15.11: етап 5 магазину частинами 5a–5c (stages-shop-split5.txt, LAST_SUB=c): у кожної частини — свої файли й тести до них
+SHOP5_PARTS = {
+    "a": (["apps/web/tailwind.config.js", "apps/web/src/components/Header.tsx", "apps/web/src/components/Footer.tsx",
+           "apps/web/src/pages/Landing.tsx"], ["header", "footer", "landing"]),
+    "b": (["apps/web/src/pages/Catalog.tsx", "apps/web/src/components/FilterPanel.tsx",
+           "apps/web/src/components/QuickView.tsx", "apps/web/src/pages/Game.tsx"], ["catalog", "filterpanel", "quickview", "game"]),
+    "c": (["apps/web/src/pages/Cart.tsx", "apps/web/src/pages/Checkout.tsx", "apps/web/src/pages/Receipt.tsx",
+           "apps/web/src/pages/News.tsx", "apps/web/src/pages/Support.tsx", "apps/web/src/pages/Account.tsx"],
+          ["cart", "checkout", "receipt"]),
+}
+
+
+def shop5_part(part):
+    files, names = SHOP5_PARTS[part]
+    for f in files:
+        need_file(f, f"частина 5{part} етапу 5 (див. її опис)")
+    tests_found = [Path(t).name.lower() for t in glob.glob("apps/web/**/*.test.tsx", recursive=True) + glob.glob("apps/web/**/*.spec.tsx", recursive=True)
+                   if "node_modules" not in t]
+    for n in names:
+        hit = [t for t in tests_found if n in t.replace("-", "").replace("_", "")]
+        (ok if hit else lambda w: bad(w, f"напиши компонентний тест apps/web/src/**/{n}*.test.tsx (vitest + Testing Library) із справжніми перевірками; він має йти в make test"))(
+            f"компонентний тест «{n}»: {', '.join(hit) if hit else 'немає'}")
+
+
 def part_check():
     """v4.1: команда, яку модель сама задала для частини при поділі (stand_split_stage)."""
     for lab, part in PART_CHECKS:
@@ -673,6 +697,8 @@ else:
             tests(mt, 10 if stage == 4 else 20, "make test")
             unit_tests_in_make_test()
             fake_tests()
+            if stage == 5 and sub in SHOP5_PARTS:
+                shop5_part(sub)
         elif stage == 6:
             need_file("e2e/*.spec.ts", "Playwright-тести (§7)")
             need_file("scripts/check-traceability*", "матриця відповідності (§2)")
